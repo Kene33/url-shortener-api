@@ -1,0 +1,41 @@
+from fastapi import APIRouter
+from fastapi.responses import RedirectResponse
+
+from app.utils.generate import generate_code
+from app.db.client import RedisClient
+
+router = APIRouter()
+client = RedisClient()
+
+@router.post("/api/links", tags=["POST"])
+async def create_link(original_link: str) -> dict:
+    original_link = original_link.replace('"', '')
+    shortcode = await generate_code()
+    key_exist = await client.get_value_by_key(shortcode)
+
+    while key_exist:
+        shortcode = await generate_code()
+
+    if not original_link.startswith("http://") and not original_link.startswith("https://"): original_link = "https://" + original_link
+    await client.add_shortlink(shortcode, original_link)
+
+    return {"ok": True, "key": shortcode}
+
+@router.get("/{shortcode}", tags=["GET"])
+async def get_link(shortcode: str):
+    link = await client.get_value_by_key(shortcode)
+
+    if link: return RedirectResponse(url=link, status_code=301)
+    return {"error": 404}
+
+@router.delete("/api/links/{shortcode}", tags=["DELETE"])
+async def delete_link(shortcode: str):
+    deleted_link = await client.delete_link(shortcode)
+    if delete_link == 1: return {"ok": True, "key": shortcode, "message": f"Link {shortcode} deleted."}
+
+    return {"ok": False, "key": shortcode, "message": f"Link {shortcode} not found."}
+
+# later
+@router.get("/api/links/{shortcode}/stats", tags=["GET"])
+async def get_link_stats(shortcode: int):
+    pass

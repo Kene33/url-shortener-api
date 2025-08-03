@@ -1,0 +1,110 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# VS Code & IDE
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test & coverage
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.egg-info/
+dist/
+build/
+
+# Docker & env
+*.env
+.env.*
+docker-compose.override.yml
+
+# Migrations
+migrations/
+
+# Node.js (if used)
+node_modules/
+npm-debug.log*
+
+# Misc
+*.bak
+*.tmp
+*.swp
+
+# Secrets & configs
+config/*.env*
+config/*.yaml
+
+# Kubernetes & Terraform
+infra/k8s/
+infra/terraform/
+terraform.tfstate
+terraform.tfstate.backup
+
+# Documentation build
+docs/_build/
+
+# Packages
+*.egg
+*.whl
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Data files (if you have any)
+data/*
+
+# Temp files
+tmp/
+temp/
+
+# C extensions
+*.so
+
+# Compiled binaries
+*.exe
+*.dll
+*.o
+*.a
+*.so
+*.dylib
+
+# Cloud-specific files
+.aws/
+.gcloud/
+.azure/
+
+# CI/CD artifacts
+.gitlab-ci.yml
+.circleci/
+.travis.yml
+app.tar.gz
+*.zip
+*.tar.gz
+
+# Monitoring
+prometheus/
+grafana/
+
+ree.md
