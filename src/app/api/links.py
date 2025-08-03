@@ -10,11 +10,11 @@ client = RedisClient()
 @router.post("/api/links", tags=["POST"])
 async def create_link(original_link: str) -> dict:
     original_link = original_link.replace('"', '')
-    shortcode = await generate_code()
+    shortcode = await generate_code(4, 8)
     key_exist = await client.get_value_by_key(shortcode)
 
     while key_exist:
-        shortcode = await generate_code()
+        shortcode = await generate_code(4, 8)
 
     if not original_link.startswith("http://") and not original_link.startswith("https://"): original_link = "https://" + original_link
     await client.add_shortlink(shortcode, original_link)
