@@ -3,19 +3,19 @@ import aiosqlite
 
 class SQLClient:
     def __init__(self) -> None:
-        self.DATABASE = "app/db/sql/links.db"
+        self.DATABASE = "src/app/db/sql/links.db"
 
     
     async def create_database(self) -> None:
         async with aiosqlite.connect(self.DATABASE) as db:
-            create_table_query = f'''
+            create_table_query = '''
             CREATE TABLE IF NOT EXISTS links (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             url TEXT NOT NULL,
             shortcode TEXT,
             createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            )
+            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
             '''
 
             await db.execute(create_table_query)
@@ -26,7 +26,7 @@ class SQLClient:
             await db.execute("""
             INSERT INTO links (url, shortcode)
             VALUES (?, ?)
-            """)
+            """, (url, shortcode))
             await db.commit()
 
             return {"ok": True}

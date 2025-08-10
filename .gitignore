@@ -108,3 +108,4 @@ prometheus/
 grafana/
 
 ree.md
+*.db

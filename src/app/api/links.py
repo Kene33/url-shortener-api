@@ -3,12 +3,13 @@ from fastapi.responses import RedirectResponse
 
 from app.utils.generate import generate_code
 from app.db.redis.links import RedisClient
-from main import sql_client
+from app.db.sql import links_db
 
 router = APIRouter()
 redis_client = RedisClient()
+sql = links_db.SQLClient()
 
-@router.post("/api/links", tags=["POST"])
+@router.post("/api/links/{original_link}", tags=["POST"])
 async def create_link(original_link: str) -> dict:
     original_link = original_link.replace('"', '')
     shortcode = await generate_code(4, 8)
@@ -19,7 +20,7 @@ async def create_link(original_link: str) -> dict:
 
     if not original_link.startswith("http://") and not original_link.startswith("https://"): original_link = "https://" + original_link
     await redis_client.add_shortlink(shortcode, original_link)
-    await sql_client.add_link(original_link, shortcode)
+    await sql.add_link(original_link, shortcode)
     return {"ok": True, "key": shortcode}
 
 @router.get("/{shortcode}", tags=["GET"])
