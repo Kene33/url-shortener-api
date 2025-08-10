@@ -28,7 +28,7 @@ async def get_link(shortcode: str):
     link = await redis_client.get_value_by_key(shortcode)
     await sql_client.increment_access_count(shortcode)
 
-    if link: return RedirectResponse(url=link, status_code=301)
+    if link: return RedirectResponse(url=link["value"], status_code=301)
     return {"error": 404}
 
 @router.delete("/api/links/{shortcode}", tags=["DELETE"])
