@@ -35,3 +35,34 @@ class SQLClient:
             except aiosqlite.Error as e:
                 print(f"Error adding link: {e}")
                 return {"ok": False, "error": str(e)}
+
+    async def get_link(self, shortcode: str) -> dict:
+        async with aiosqlite.connect(self.DATABASE) as db:
+            try:
+                cursor = await db.execute("""
+                SELECT url FROM links WHERE shortcode = ?
+                """, (shortcode,))
+                row = await cursor.fetchone()
+                if row:
+                    return {"ok": True, "url": row[0]}
+                else:
+                    return {"ok": False, "error": f"Link {shortcode} not found"}
+            except aiosqlite.Error as e:
+                print(f"Error with getting link: {e}")
+                return {"ok": False, "error": str(e)}
+
+    async def delete_link(self, shortcode: str) -> dict:
+        async with aiosqlite.connect(self.DATABASE) as db:
+            try:
+                cursor = await db.execute("""
+                DELETE FROM links WHERE shortcode = ?
+                """, (shortcode,))
+                await db.commit()
+
+                if cursor.rowcount > 0:
+                    return {"ok": True, "message": f"Link {shortcode} deleted."}
+                else:
+                    return {"ok": False, "message": f"Link {shortcode} not found."}
+            except aiosqlite.Error as e:
+                print(f"Error deleting link: {e}")
+                return {"ok": False, "error": str(e)}
