@@ -76,10 +76,6 @@ class SQLClient:
                 """, (shortcode,))
                 await db.commit()
 
-                updatedAt_cursor = await db.execute("""
-                UPDATE links SET updatedAt = ? WHERE shortcode = ?
-                """, (updatedAt, shortcode,))
-
                 if cursor.rowcount > 0:
                     return {"ok": True, "message": f"accessCount for {shortcode} incremented."}
                 else:

@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 
 from app.utils.generate import generate_code
 from app.db.redis.links import RedisClient
-from app.db.sql.links_db import SQLClient
+from app.db.sql.crud import SQLClient
 
 router = APIRouter()
 redis_client = RedisClient()
