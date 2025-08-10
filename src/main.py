@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
-from app.db.sql.links_db import create_database
+from app.db.sql.links_db import SQLClient
 
 app = FastAPI(title="API")
 app.include_router(api_router)
@@ -19,7 +19,8 @@ app.add_middleware(
 )
 
 async def on_startup():
-    await create_database()
+    sql = SQLClient()
+    await sql.create_database()
 
 if __name__ == "__main__":
     asyncio.run(on_startup())
