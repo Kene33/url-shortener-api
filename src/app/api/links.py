@@ -27,7 +27,7 @@ async def create_link(original_link: str) -> dict:
 async def get_link(shortcode: str):
     link = await redis_client.get_value_by_key(shortcode)
     await sql_client.increment_access_count(shortcode)
-    
+
     if link: return RedirectResponse(url=link, status_code=301)
     return {"error": 404}
 
@@ -38,7 +38,17 @@ async def delete_link(shortcode: str):
 
     return {"ok": False, "key": shortcode, "message": f"Link {shortcode} not found."}
 
-# later
 @router.get("/api/links/{shortcode}/stats", tags=["GET"])
-async def get_link_stats(shortcode: int):
-    pass
+async def get_link_stats(shortcode: str):
+    link_stats = await sql_client.get_link(shortcode)
+    if link_stats["ok"]:
+        return {
+            "ok": True,
+            "id": link_stats["id"],
+            "url": link_stats["url"],
+            "shortcode": link_stats["shortcode"],
+            "createdAt": link_stats["createdAt"],
+            "updatedAt": link_stats["updatedAt"],
+            "accessCount": link_stats["accessCount"]
+        }
+    return {"ok": False, "error": link_stats["error"]}
