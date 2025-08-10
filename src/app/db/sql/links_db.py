@@ -14,7 +14,9 @@ class SQLClient:
             url TEXT NOT NULL,
             shortcode TEXT,
             createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+            accessCount INTEGER DEFAULT 0,
+            UNIQUE(shortcode)
             );
             '''
 
