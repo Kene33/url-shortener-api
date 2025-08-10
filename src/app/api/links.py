@@ -26,7 +26,8 @@ async def create_link(original_link: str) -> dict:
 @router.get("/{shortcode}", tags=["GET"])
 async def get_link(shortcode: str):
     link = await redis_client.get_value_by_key(shortcode)
-
+    await sql_client.increment_access_count(shortcode)
+    
     if link: return RedirectResponse(url=link, status_code=301)
     return {"error": 404}
 

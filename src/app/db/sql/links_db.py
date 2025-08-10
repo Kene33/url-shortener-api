@@ -1,5 +1,5 @@
 import aiosqlite
-
+from datetime import datetime
 
 class SQLClient:
     def __init__(self) -> None:
@@ -68,6 +68,7 @@ class SQLClient:
                 return {"ok": False, "error": str(e)}
             
     async def increment_access_count(self, shortcode: str) -> dict:
+        updatedAt = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         async with aiosqlite.connect(self.DATABASE) as db:
             try:
                 cursor = await db.execute("""
@@ -75,15 +76,30 @@ class SQLClient:
                 """, (shortcode,))
                 await db.commit()
 
-                accessCount_cursor = await db.execute("""
-                SELECT accessCount FROM links WHERE shortcode = ?
-                """, (shortcode,))
-                accessCount = await accessCount_cursor.fetchone()
+                updatedAt_cursor = await db.execute("""
+                UPDATE links SET updatedAt = ? WHERE shortcode = ?
+                """, (updatedAt, shortcode,))
 
                 if cursor.rowcount > 0:
-                    return {"ok": True, "message": f"accessCount = {accessCount} for {shortcode}."}
+                    return {"ok": True, "message": f"accessCount for {shortcode} incremented."}
                 else:
                     return {"ok": False, "message": f"Link {shortcode} not found."}
             except aiosqlite.Error as e:
                 print(f"Error incrementing access count: {e}")
+                return {"ok": False, "error": str(e)}
+            
+    async def get_link_stats(self, shortcode: str) -> dict:
+        async with aiosqlite.connect(self.DATABASE) as db:
+            try:
+                cursor = await db.execute("""
+                SELECT id, url, shortcode, createdAt, updatedAt, accessCount FROM links WHERE shortcode = ?
+                """, (shortcode,))
+                row = await cursor.fetchone()
+
+                if row:
+                    return {"ok": True, "id": row[0], "url": row[1], "shortcode": row[2], "createdAt": row[3], "updatedAt": row[4], "accessCount": row[5]}
+                else:
+                    return {"ok": False, "error": f"Link {shortcode} not found"}
+            except aiosqlite.Error as e:
+                print(f"Error with getting link stats: {e}")
                 return {"ok": False, "error": str(e)}
