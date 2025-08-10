@@ -5,14 +5,18 @@ class RedisClient:
         self.pool = redis.ConnectionPool(host=host, port=port, db=db)
         self.client = redis.Redis(connection_pool=self.pool, decode_responses=True)
 
-    async def add_shortlink(self, key: str, value: str) -> str:
+    async def add_shortlink(self, key: str, value: str) -> dict:
         added_link = await self.client.set(key, value)
-        return added_link
+        if added_link:
+            return {"ok": True, "key": key, "value": value}
+        return {"ok": False, "key": key, "message": f"Link {key} already exists."}
     
-    async def get_value_by_key(self, key: str) -> str | None:
+    async def get_value_by_key(self, key: str) -> dict:
         value = await self.client.get(key)
         value = value.decode('utf-8') if value else None
-        return value
+        if value:
+            return {"ok": True, "key": key, "value": value}
+        return {"ok": False, "key": key, "message": f"Link {key} not found."}
     
     async def delete_link(self, key: str) -> dict:
         deleted_link = await self.client.delete(key)
