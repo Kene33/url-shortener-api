@@ -3,7 +3,7 @@ import aiosqlite
 
 class SQLClient:
     def __init__(self) -> None:
-        self.DATABASE = "src/database/posts.db"
+        self.DATABASE = "app/db/sql/links.db"
 
     
     async def create_database(self) -> None:
