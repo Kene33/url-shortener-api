@@ -27,5 +27,6 @@ class SQLClient:
             INSERT INTO links (url, shortcode)
             VALUES (?, ?)
             """)
+            await db.commit()
 
             return {"ok": True}
