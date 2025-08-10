@@ -33,8 +33,10 @@ async def get_link(shortcode: str):
 
 @router.delete("/api/links/{shortcode}", tags=["DELETE"])
 async def delete_link(shortcode: str):
-    deleted_link = await redis_client.delete_link(shortcode)
-    if deleted_link == 1: return {"ok": True, "key": shortcode, "message": f"Link {shortcode} deleted."}
+    redis_link = await redis_client.delete_link(shortcode)
+    sql_link = await sql_client.delete_link(shortcode)
+    if redis_link["ok"] and sql_link["ok"]:
+        return {"ok": True, "key": shortcode, "message": f"Link {shortcode} deleted."}
 
     return {"ok": False, "key": shortcode, "message": f"Link {shortcode} not found."}
 

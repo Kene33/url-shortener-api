@@ -14,6 +14,8 @@ class RedisClient:
         value = value.decode('utf-8') if value else None
         return value
     
-    async def delete_link(self, key: str) -> int:
+    async def delete_link(self, key: str) -> dict:
         deleted_link = await self.client.delete(key)
-        return deleted_link
+        if deleted_link == 1:
+            return {"ok": True, "key": key, "message": f"Link {key} deleted."}
+        return {"ok": False, "key": key, "message": f"Link {key} not found."}
