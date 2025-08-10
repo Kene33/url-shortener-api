@@ -40,7 +40,7 @@ async def delete_link(shortcode: str):
 
 @router.get("/api/links/{shortcode}/stats", tags=["GET"])
 async def get_link_stats(shortcode: str):
-    link_stats = await sql_client.get_link(shortcode)
+    link_stats = await sql_client.get_link_stats(shortcode)
     if link_stats["ok"]:
         return {
             "ok": True,
