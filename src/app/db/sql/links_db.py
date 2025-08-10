@@ -66,3 +66,24 @@ class SQLClient:
             except aiosqlite.Error as e:
                 print(f"Error deleting link: {e}")
                 return {"ok": False, "error": str(e)}
+            
+    async def increment_access_count(self, shortcode: str) -> dict:
+        async with aiosqlite.connect(self.DATABASE) as db:
+            try:
+                cursor = await db.execute("""
+                UPDATE links SET accessCount = accessCount + 1 WHERE shortcode = ?
+                """, (shortcode,))
+                await db.commit()
+
+                accessCount_cursor = await db.execute("""
+                SELECT accessCount FROM links WHERE shortcode = ?
+                """, (shortcode,))
+                accessCount = await accessCount_cursor.fetchone()
+
+                if cursor.rowcount > 0:
+                    return {"ok": True, "message": f"accessCount = {accessCount} for {shortcode}."}
+                else:
+                    return {"ok": False, "message": f"Link {shortcode} not found."}
+            except aiosqlite.Error as e:
+                print(f"Error incrementing access count: {e}")
+                return {"ok": False, "error": str(e)}
