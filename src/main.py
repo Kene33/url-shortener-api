@@ -1,5 +1,6 @@
 import uvicorn
 import asyncio
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,8 +11,6 @@ from app.db.sql.crud import SQLClient
 app = FastAPI(title="API")
 app.include_router(api_router)
 
-sql_client = SQLClient()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:8000"],
@@ -20,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
+sql_client = SQLClient()
 async def on_startup():
     await sql_client.create_database()
 

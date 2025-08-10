@@ -1,11 +1,12 @@
 import aiosqlite
 from datetime import datetime
 
+#DATABASE = "src/app/db/sql/links.db"
+#TEST_DATABASE = "src/app/db/sql/links_test.db"
 class SQLClient:
-    def __init__(self) -> None:
-        self.DATABASE = "src/app/db/sql/links.db"
+    def __init__(self, DATABASE = "src/app/db/sql/links.db") -> None:
+        self.DATABASE = DATABASE
 
-    
     async def create_database(self) -> None:
         async with aiosqlite.connect(self.DATABASE) as db:
             create_table_query = '''
@@ -31,6 +32,7 @@ class SQLClient:
                 VALUES (?, ?)
                 """, (url, shortcode))
                 await db.commit()
+                print(f"Link {shortcode} added with URL: {url}")
                 return {"ok": True}
             except aiosqlite.Error as e:
                 print(f"Error adding link: {e}")

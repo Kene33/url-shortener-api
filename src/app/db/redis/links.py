@@ -1,7 +1,9 @@
 import redis.asyncio as redis 
+import os
 
 class RedisClient:
-    def __init__(self, host: str = "localhost", port: int = 6379, db: str | int = 0): 
+    def __init__(self, host = "localhost", port = 6379, db = 0) -> None:
+
         self.pool = redis.ConnectionPool(host=host, port=port, db=db)
         self.client = redis.Redis(connection_pool=self.pool, decode_responses=True)
 
