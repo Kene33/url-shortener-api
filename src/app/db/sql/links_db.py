@@ -23,10 +23,13 @@ class SQLClient:
 
     async def add_link(self, url: str, shortcode: str) -> dict:
         async with aiosqlite.connect(self.DATABASE) as db:
-            await db.execute("""
-            INSERT INTO links (url, shortcode)
-            VALUES (?, ?)
-            """, (url, shortcode))
-            await db.commit()
-
-            return {"ok": True}
+            try:
+                await db.execute("""
+                INSERT INTO links (url, shortcode)
+                VALUES (?, ?)
+                """, (url, shortcode))
+                await db.commit()
+                return {"ok": True}
+            except aiosqlite.Error as e:
+                print(f"Error adding link: {e}")
+                return {"ok": False, "error": str(e)}
