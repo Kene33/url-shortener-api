@@ -10,6 +10,8 @@ from app.db.sql.links_db import SQLClient
 app = FastAPI(title="API")
 app.include_router(api_router)
 
+sql_client = SQLClient()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:4000"],
@@ -19,8 +21,7 @@ app.add_middleware(
 )
 
 async def on_startup():
-    sql = SQLClient()
-    await sql.create_database()
+    await sql_client.create_database()
 
 if __name__ == "__main__":
     asyncio.run(on_startup())

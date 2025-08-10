@@ -3,11 +3,10 @@ from fastapi.responses import RedirectResponse
 
 from app.utils.generate import generate_code
 from app.db.redis.links import RedisClient
-from app.db.sql.links_db import SQLClient
+from main import sql_client
 
 router = APIRouter()
 redis_client = RedisClient()
-sql_client = SQLClient()
 
 @router.post("/api/links", tags=["POST"])
 async def create_link(original_link: str) -> dict:
