@@ -7,7 +7,7 @@ from app.db.sql.links_db import SQLClient
 
 router = APIRouter()
 redis_client = RedisClient()
-sql = SQLClient()
+sql_client = SQLClient()
 
 @router.post("/api/links/{original_link}", tags=["POST"])
 async def create_link(original_link: str) -> dict:
@@ -20,7 +20,7 @@ async def create_link(original_link: str) -> dict:
 
     if not original_link.startswith("http://") and not original_link.startswith("https://"): original_link = "https://" + original_link
     await redis_client.add_shortlink(shortcode, original_link)
-    await sql.add_link(original_link, shortcode)
+    await sql_client.add_link(original_link, shortcode)
     return {"ok": True, "key": shortcode}
 
 @router.get("/{shortcode}", tags=["GET"])
