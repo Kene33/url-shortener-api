@@ -86,7 +86,7 @@ python scripts/seed_db.py
 ### Создание короткого URL
 
 ```bash
-curl -X POST "http://localhost:8000/api/links/https://example.com"
+curl -X POST "http://localhost:8000/api/links/github.com"
 ```
 
 Ответ:
@@ -108,7 +108,7 @@ curl "http://localhost:8000/api/links/abc123/stats"
 {
     "ok": true,
     "id": 1,
-    "url": "https://example.com",
+    "url": "https://github.com",
     "shortcode": "abc123",
     "createdAt": "2024-02-20 10:30:00",
     "updatedAt": "2024-02-20 10:30:00",
