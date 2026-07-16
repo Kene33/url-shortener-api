@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">LinkCutter logo</title>
+  <desc id="desc">Interlocked chain links with a diagonal cut mark.</desc>
+  <rect x="98" y="118" width="188" height="118" rx="59" transform="rotate(-35 98 118)" fill="#22C3A6"/>
+  <rect x="98" y="118" width="188" height="118" rx="59" transform="rotate(-35 98 118)" stroke="#0F172A" stroke-width="28"/>
+  <rect x="228" y="276" width="188" height="118" rx="59" transform="rotate(-35 228 276)" fill="#5B7CFA"/>
+  <rect x="228" y="276" width="188" height="118" rx="59" transform="rotate(-35 228 276)" stroke="#0F172A" stroke-width="28"/>
+  <path d="M170 320L341 191" stroke="#FF6B57" stroke-width="36" stroke-linecap="round"/>
+  <path d="M215 202L298 309" stroke="#F8FAFC" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="356" cy="136" r="20" fill="#FFD166" stroke="#0F172A" stroke-width="16"/>
+</svg>

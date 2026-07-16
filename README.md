@@ -1,127 +1,71 @@
-# LinkCutter
+<div align="center">
+  <img src="./docs/readme-assets/logo.svg" alt="LinkCutter logo" width="220" />
+  <h1>LinkCutter</h1>
+  <p><strong>FastAPI and React link shortener with guest links, account workspaces, analytics, and admin moderation.</strong></p>
+  <p><strong>Сервис коротких ссылок на FastAPI и React с гостевым режимом, личным кабинетом, аналитикой и админ-модерацией.</strong></p>
+  <p>
+    <a href="#quick-start">Quick start</a>
+    ·
+    <a href="#architecture">Architecture</a>
+    ·
+    <a href="#api-scope">API scope</a>
+    ·
+    <a href="./CONTRIBUTING.md">Contributing</a>
+    ·
+    <a href="./SECURITY.md">Security</a>
+    ·
+    <a href="./CHANGELOG.md">Changelog</a>
+  </p>
+  <p>
+    <img alt="CI" src="https://github.com/Kene33/url-shortener-api/actions/workflows/ci.yml/badge.svg" />
+    <img alt="License" src="https://img.shields.io/github/license/Kene33/url-shortener-api?color=0f766e" />
+    <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" />
+    <img alt="FastAPI 0.116.1" src="https://img.shields.io/badge/FastAPI-0.116.1-009688?logo=fastapi&logoColor=white" />
+    <img alt="React 19" src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" />
+    <img alt="Docker Compose" src="https://img.shields.io/badge/Docker_Compose-ready-2496ED?logo=docker&logoColor=white" />
+  </p>
+</div>
 
-Сервис коротких ссылок с гостевым режимом, личным кабинетом, базовой
-статистикой и защищённой административной модерацией. Backend находится в
-`src/`, React frontend — в `frontend/`.
+LinkCutter ships two working surfaces in one repository:
 
-## Возможности
+- a FastAPI backend for guest short links, auth, personal workspaces, analytics, and admin actions
+- a React 19 frontend for guests and signed-in users
 
-- гостевое создание ссылок без регистрации;
-- домены без схемы автоматически получают `https://`;
-- безопасная проверка URL и запрет credentials/localhost/private literal IP;
-- регистрация, подтверждение email, login, refresh/logout и восстановление пароля;
-- Argon2-хэши паролей, JWT access tokens и отзываемые refresh tokens;
-- личные ссылки с режимами `reuse` и `new`;
-- пагинация, фильтры, label, активность и базовая статистика;
-- admin API для пользователей и всех гостевых/личных ссылок;
-- неизменяемые целевой URL, shortcode и владелец ссылки;
-- SQLite как источник истины и Redis как необязательный кэш;
-- healthcheck, Docker Compose, Ruff, pytest и GitHub Actions.
+This repository does not document a public demo. Run it locally.
 
-Гостевая статистика не публикуется. Администратор может отключить ссылку или
-изменить label, но не может подменить её назначение.
+## Project Snapshot
 
-## Swagger
+| Area | Stack | Verified scope |
+| --- | --- | --- |
+| Backend | FastAPI, Pydantic v2, Uvicorn | Guest and account link creation, redirects, auth, admin API |
+| Frontend | React 19, TypeScript, Vite, Tailwind | Guest creation, links, folders, analytics, notifications, profile, settings |
+| Storage | SQLite | Source of truth for users, links, sessions, notifications, analytics |
+| Cache | Redis 7 | Optional redirect cache with degraded readiness when unavailable |
+| Auth | Argon2, JWT access tokens, rotating refresh cookies | Register, verify email, login, logout, password reset, email 2FA |
+| QA | Ruff, pytest, Vitest, Playwright, GitHub Actions | Backend lint and tests, frontend lint, unit and browser checks |
 
-Интерактивная документация: `http://localhost:8000/docs`.
+## Quick Start
 
-OpenAPI JSON: `http://localhost:8000/openapi.json`.
+### Docker Compose
 
-## Интерфейс
+Use this path if you want the frontend, API, SQLite, and Redis wired together.
 
-Frontend доступен на `http://localhost:3000`. Гость может сразу сократить
-ссылку; после входа доступны личные ссылки, папки, аналитика, настройки,
-профиль и уведомления. URL и shortcode нельзя изменить. Если пользователь
-пытается создать уже существующий URL, интерфейс предлагает использовать
-существующую ссылку или создать новую кампанию с отдельной статистикой.
-
-В Swagger защищённые операции используют кнопку `Authorize`. В неё передаётся
-только значение access token; префикс Bearer интерфейс добавляет автоматически.
-
-## API
-
-### Общие операции
-
-| Метод | Путь | Назначение |
-|---|---|---|
-| `POST` | `/api/v1/links` | Создать гостевую или личную ссылку |
-| `GET` | `/{shortcode}` | Редирект `307` и запись перехода |
-| `GET` | `/health/live` | Проверить работу процесса |
-| `GET` | `/health/ready` | Проверить SQLite и Redis |
-
-Гостевой запрос:
-
-```json
-{
-  "url": "google.com"
-}
+```bash
+cp .env.example .env
+docker compose up --build
 ```
 
-`google.com` нормализуется в `https://google.com/`. Повторный гостевой URL
-возвращает тот же shortcode с `200 OK` и `created: false`.
+Open these local URLs after the stack starts:
 
-Авторизованный запрос:
+- App: `http://127.0.0.1:3000`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- OpenAPI: `http://127.0.0.1:8000/openapi.json`
 
-```json
-{
-  "url": "https://example.com/campaign",
-  "mode": "new",
-  "label": "Реклама у блогера A"
-}
-```
+Compose serves the frontend through Nginx. Nginx proxies `/api`, `/health`, and shortcode redirects to FastAPI.
 
-`reuse` возвращает активную ссылку владельца для этого URL. `new` создаёт новый
-shortcode с отдельной статистикой.
+### Local Development
 
-### Авторизация
-
-| Метод | Путь | Назначение |
-|---|---|---|
-| `POST` | `/api/v1/auth/register` | Зарегистрировать пользователя |
-| `POST` | `/api/v1/auth/verify-email` | Подтвердить email |
-| `POST` | `/api/v1/auth/login` | Получить access и refresh tokens |
-| `POST` | `/api/v1/auth/refresh` | Ротировать refresh token |
-| `POST` | `/api/v1/auth/logout` | Отозвать refresh token |
-| `POST` | `/api/v1/auth/password-reset/request` | Запросить сброс пароля |
-| `POST` | `/api/v1/auth/password-reset/confirm` | Установить новый пароль |
-| `GET` | `/api/v1/me` | Получить текущего пользователя |
-
-Access token короткоживущий. Refresh token хранится в SQLite только как SHA-256
-хэш, ротируется при использовании и отзывается при logout или смене пароля.
-
-Пока email-провайдер не подключён, development-окружение возвращает одноразовый
-verification/reset token в ответе. В production эти поля скрываются.
-
-### Личный кабинет
-
-| Метод | Путь | Назначение |
-|---|---|---|
-| `GET` | `/api/v1/me/links` | Свои ссылки с пагинацией и фильтрами |
-| `GET` | `/api/v1/me/links/{shortcode}` | Ссылка и базовая статистика |
-| `PATCH` | `/api/v1/me/links/{shortcode}` | Изменить `label` или `is_active` |
-
-Ответ содержит исходный и короткий URL, статус, label, число переходов, дату
-создания, дату обновления и последний переход. Чужая ссылка отвечает `404`.
-Поля URL и shortcode отсутствуют в PATCH-модели.
-
-### Администрация
-
-| Метод | Путь | Назначение |
-|---|---|---|
-| `GET` | `/api/v1/admin/users` | Все пользователи |
-| `GET` | `/api/v1/admin/users/{user_id}` | Конкретный пользователь |
-| `PATCH` | `/api/v1/admin/users/{user_id}` | Статус аккаунта и роль admin |
-| `GET` | `/api/v1/admin/links` | Все гостевые и личные ссылки |
-| `GET` | `/api/v1/admin/links/{shortcode}` | Любая ссылка и статистика |
-| `PATCH` | `/api/v1/admin/links/{shortcode}` | Модерация `label/is_active` |
-
-Роль назначается при регистрации, если email находится в `ADMIN_EMAILS`.
-Публичного параметра `is_admin` в регистрации нет. Активный администратор не
-может отключить или понизить собственный аккаунт.
-
-## Локальный запуск
-
-Требуются Python 3.11+ и, опционально, Redis.
+Run the backend:
 
 ```bash
 python3 -m venv .venv
@@ -131,9 +75,7 @@ cp .env.example .env
 uvicorn main:app --app-dir src --reload
 ```
 
-Без Redis приложение продолжает работать; readiness сообщает `degraded`.
-
-В отдельном терминале запустите интерфейс:
+Run the frontend in a second terminal:
 
 ```bash
 cd frontend
@@ -141,83 +83,104 @@ npm ci
 npm run dev
 ```
 
-## Docker Compose
+Local defaults:
+
+- Vite serves the frontend on `http://127.0.0.1:3000`
+- Vite proxies `/api` and `/health` to `http://127.0.0.1:8000`
+- direct backend runs use `PUBLIC_BASE_URL=http://localhost:8000` unless you override it
+
+If you want the first registered user to become an admin, set `ADMIN_EMAILS` in `.env` before that account signs up.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser["Browser"] --> Frontend["React 19 frontend"]
+    Frontend -->|REST + cookies| API["FastAPI API"]
+    API --> SQL["SQLite"]
+    API --> Cache["Redis cache"]
+    API --> Files["Local avatar storage"]
+    API --> Redirect["307 redirect responses"]
+    CI["GitHub Actions"] --> BackendChecks["Ruff + pytest"]
+    CI --> FrontendChecks["npm run lint + npm test + npm run build"]
+```
+
+Key behavior:
+
+- SQLite stays the source of truth.
+- Redis caches shortcodes and can drop out without stopping the app.
+- FastAPI issues JWT access tokens and rotating refresh cookies.
+- The frontend uses relative API paths. Vite proxies them in local development and Nginx proxies them in Compose.
+
+### Optional Demo Data
+
+The local-only seed creates verified demo admin and user accounts, folders, active and disabled links, notifications, and aggregate click data. It refuses production mode and requires an explicit password.
 
 ```bash
-docker compose up --build
+DEMO_SEED_PASSWORD='DemoPass123!' PYTHONPATH=src python -m app.demo_seed
 ```
 
-Интерфейс публикуется на `127.0.0.1:${FRONTEND_PORT:-3000}`, Swagger — на
-`127.0.0.1:${APP_PORT:-8000}/docs`. Nginx проксирует API и короткие коды в
-FastAPI, поэтому переход на несуществующий код показывает страницу 404. SQLite
-и Redis используют отдельные Docker volumes.
+Use `demo-admin@example.com` or `demo-user@example.com` with the password you supplied. Do not run this command against data you want to keep.
 
-## Ошибки
+## API Scope
 
-Обычная ошибка:
+| Surface | Paths | What it covers |
+| --- | --- | --- |
+| Public links | `POST /api/v1/links`, `GET /{shortcode}` | Guest link creation, owner link creation, 307 redirects, click counting |
+| Auth | `/api/v1/auth/*`, `GET /api/v1/me` | Register, verify email, login, refresh, logout, password reset, 2FA login challenge |
+| Personal workspace | `/api/v1/me/links*`, `/api/v1/me/folders*` | Link lists, search, sorting, labels, folders, active state |
+| Analytics | `/api/v1/me/analytics`, `/api/v1/me/links/{shortcode}/analytics` | Summary metrics, time buckets, top links, timezone-aware queries |
+| Profile and account | `/api/v1/me/profile`, `/api/v1/me/avatar`, `/api/v1/me/preferences`, `/api/v1/me/export`, `DELETE /api/v1/me` | Profile edits, avatar upload, theme and language settings, JSON export, account deletion |
+| Notifications | `/api/v1/me/notifications*` | List, mark one read, mark all read |
+| Admin | `/api/v1/admin/users*`, `/api/v1/admin/links*`, `/api/v1/admin/settings*` | User moderation, link moderation, link-retention settings |
+| Health | `/health/live`, `/health/ready` | Process status, SQLite check, Redis status |
 
-```json
-{
-  "code": "link_not_found",
-  "detail": "Short link not found"
-}
-```
+Backend rules worth knowing:
 
-Ошибка валидации дополнительно содержит `errors`. Основные коды:
-`validation_error`, `link_not_found`, `link_disabled`,
-`authentication_required`, `invalid_access_token`, `invalid_refresh_token`,
-`invalid_credentials`, `email_not_verified`, `admin_required`,
-`storage_unavailable` и `shortcode_unavailable`.
+- Guest duplicates reuse one shortcode and return `200` with `created: false`.
+- Bare domains normalize to `https://...`.
+- The API rejects credentials in URLs and non-global targets such as `localhost` and private IP ranges.
+- Owners and admins can change labels and active state. They cannot change the target URL or shortcode.
 
-## Конфигурация
+## Testing
 
-| Переменная | Назначение | По умолчанию |
-|---|---|---|
-| `PUBLIC_BASE_URL` | Публичный адрес коротких ссылок | `http://localhost:8000` |
-| `DATABASE_PATH` | SQLite database | `data/links.db` |
-| `REDIS_URL` | Redis | `redis://localhost:6379/0` |
-| `CACHE_TTL_SECONDS` | TTL кэша | `3600` |
-| `AUTH_SECRET_KEY` | Секрет подписи JWT | dev-only |
-| `ACCESS_TOKEN_MINUTES` | Жизнь access token | `15` |
-| `REFRESH_TOKEN_DAYS` | Жизнь refresh token | `30` |
-| `EMAIL_VERIFICATION_HOURS` | Жизнь verification token | `24` |
-| `PASSWORD_RESET_MINUTES` | Жизнь reset token | `30` |
-| `ADMIN_EMAILS` | Email будущих администраторов | `[]` |
-| `CORS_ORIGINS` | Разрешённые frontend origins | localhost:3000 |
-| `LOG_LEVEL` | Уровень логирования | `INFO` |
-
-В production необходимо заменить `AUTH_SECRET_KEY`; приложение откажется
-запускаться со стандартным development-секретом.
-
-## Архитектура
-
-```text
-HTTP API -> AuthService -> SQLite
-         -> LinkService -> SQLite
-                        \-> Redis cache
-```
-
-SQLite хранит пользователей, хэши refresh/action tokens, владение ссылками и
-агрегированную статистику. Redis ускоряет редиректы, но не является источником
-истины.
-
-## Проверки
+The CI workflow on `main` runs these checks:
 
 ```bash
 ruff check .
-pytest
+pytest --cov=src --cov-report=term-missing --cov-report=xml
+cd frontend && npm run lint
+cd frontend && npm test
+cd frontend && npm run build
+cd frontend && npm run test:e2e
 ```
 
-Те же проверки выполняются в GitHub Actions.
+## Repository Layout
 
-## Дальнейший план
+| Path | Purpose |
+| --- | --- |
+| `src/` | FastAPI app, services, schemas, persistence, Redis cache |
+| `frontend/` | React app, API client, pages, frontend tests |
+| `tests/` | Backend test suite |
+| `scripts/` | Local helper scripts |
+| `docker-compose.yml` | Local multi-service stack |
 
-1. Подключить email-провайдера.
-2. Добавить rate limiting и защиту auth endpoints от перебора.
-3. Добавить жалобы, admin audit log и причины блокировки.
-4. Перейти на PostgreSQL и Alembic перед масштабированием.
-5. Добавить метрики, резервные копии и error tracking.
+## Limitations
 
-## Лицензия
+- The repo does not expose a verified public demo.
+- Email verification, password reset, and email 2FA return debug tokens or codes in development. Production needs a configured email provider.
+- SQLite is the only persistent database in the repo. No migration layer or alternate production database is present.
+- Redis improves redirect speed, but the app must tolerate cache misses and degraded readiness.
+- Rate limiting uses Redis when available and an in-memory fallback locally. It is not a distributed production limiter.
+- Local avatar storage, SQLite, and development email tokens are deliberate pet-project boundaries.
 
-MIT
+## Supporting Docs
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [SECURITY.md](./SECURITY.md)
+- [CHANGELOG.md](./CHANGELOG.md)
+- [docs/readme-assets/logo.svg](./docs/readme-assets/logo.svg)
+
+## License
+
+This project uses the [MIT License](./LICENSE).
