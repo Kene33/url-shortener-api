@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import UTC, datetime
 
 from typing import Annotated
@@ -5,7 +6,8 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.api.dependencies import get_link_service, get_optional_user, get_settings
+from app.api.dependencies import get_link_service, get_optional_user, get_rate_limiter, get_settings
+from app.api.rate_limit import enforce_rate_limit, guest_link_policy, rate_limit_subject
 from app.core.config import Settings
 from app.core.errors import APIError
 from app.db.sql.crud import UserRecord
@@ -16,6 +18,7 @@ from app.schemas.links import (
     ValidationErrorResponse,
 )
 from app.services.links import LinkDisabledError, LinkService
+from app.services.rate_limit import RateLimiter
 
 router = APIRouter(tags=["links"])
 
@@ -61,6 +64,8 @@ def browser_link_error(
     responses={
         200: {"model": CreateLinkResponse},
         401: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         422: {"model": ValidationErrorResponse},
         503: {"model": ErrorResponse},
@@ -68,8 +73,10 @@ def browser_link_error(
 )
 async def create_link(
     payload: Annotated[CreateLinkRequest, Body()],
+    request: Request,
     response: Response,
     service: Annotated[LinkService, Depends(get_link_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
     user: Annotated[UserRecord | None, Depends(get_optional_user)],
 ) -> CreateLinkResponse:
@@ -80,6 +87,13 @@ async def create_link(
             status_code=status.HTTP_401_UNAUTHORIZED,
             code="authentication_required",
             detail="mode, label and folder_id require an authenticated account",
+        )
+    if user is None:
+        await enforce_rate_limit(
+            limiter=rate_limiter,
+            policy=guest_link_policy(settings),
+            subject=rate_limit_subject(request),
+            response=response,
         )
     try:
         if user is None:
@@ -93,6 +107,12 @@ async def create_link(
                 folder_id=payload.folder_id,
                 reuse=payload.mode == "reuse",
             )
+    except sqlite3.IntegrityError as exc:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="folder_not_found",
+            detail="Folder not found",
+        ) from exc
     except LinkDisabledError as exc:
         raise APIError(
             status_code=status.HTTP_409_CONFLICT,

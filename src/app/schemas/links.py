@@ -85,6 +85,7 @@ class ErrorResponse(BaseModel):
         "email_already_in_use",
         "account_deleted",
         "invalid_timezone",
+        "rate_limit_exceeded",
     ]
     detail: str
 

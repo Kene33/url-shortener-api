@@ -248,6 +248,9 @@ async def test_admin_can_manage_users_and_moderate_all_links_and_settings(app_fa
             "/api/v1/admin/users",
             headers=bearer(regular_tokens),
         )
+        unauthenticated = await harness.client.get("/api/v1/admin/users")
+        assert unauthenticated.status_code == 401
+        assert unauthenticated.json()["code"] == "authentication_required"
         assert denied.status_code == 403
         assert denied.json()["code"] == "admin_required"
 

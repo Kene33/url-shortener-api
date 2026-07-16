@@ -187,6 +187,85 @@ class SQLClient:
             assert user is not None
             return user
 
+    async def upsert_seed_user(
+        self,
+        email: str,
+        password_hash: str,
+        *,
+        is_admin: bool,
+        display_name: str,
+        email_verified: bool = True,
+        is_active: bool = True,
+        two_factor_enabled: bool = False,
+    ) -> UserRecord:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                f"SELECT {USER_COLUMNS} FROM users WHERE email = ? COLLATE NOCASE LIMIT 1",
+                (email,),
+            )
+            existing = self._to_user(await cursor.fetchone())
+            if existing is None:
+                cursor = await db.execute(
+                    f"""
+                    INSERT INTO users (
+                        email,
+                        password_hash,
+                        is_admin,
+                        is_active,
+                        email_verified,
+                        display_name,
+                        two_factor_enabled
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    RETURNING {USER_COLUMNS}
+                    """,
+                    (
+                        email,
+                        password_hash,
+                        int(is_admin),
+                        int(is_active),
+                        int(email_verified),
+                        display_name,
+                        int(two_factor_enabled),
+                    ),
+                )
+            else:
+                cursor = await db.execute(
+                    f"""
+                    UPDATE users
+                    SET password_hash = ?,
+                        is_admin = ?,
+                        is_active = ?,
+                        email_verified = ?,
+                        display_name = ?,
+                        avatar_path = NULL,
+                        pending_email = NULL,
+                        deleted_at = NULL,
+                        links_expire_at = NULL,
+                        two_factor_enabled = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    RETURNING {USER_COLUMNS}
+                    """,
+                    (
+                        password_hash,
+                        int(is_admin),
+                        int(is_active),
+                        int(email_verified),
+                        display_name,
+                        int(two_factor_enabled),
+                        existing.id,
+                    ),
+                )
+            user = self._to_user(await cursor.fetchone())
+            assert user is not None
+            await db.execute(
+                "INSERT OR IGNORE INTO preferences (user_id) VALUES (?)",
+                (user.id,),
+            )
+            await db.commit()
+            return user
+
     async def get_user_by_id(self, user_id: int) -> UserRecord | None:
         async with self._connect() as db:
             cursor = await db.execute(
@@ -799,6 +878,43 @@ class SQLClient:
             assert folder is not None
             return folder
 
+    async def clear_seed_user_data(self, user_id: int) -> None:
+        async with self._connect() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            await db.execute(
+                """
+                DELETE FROM analytics_hourly
+                WHERE link_id IN (SELECT id FROM links WHERE owner_id = ?)
+                """,
+                (user_id,),
+            )
+            await db.execute(
+                """
+                DELETE FROM analytics_daily
+                WHERE link_id IN (SELECT id FROM links WHERE owner_id = ?)
+                """,
+                (user_id,),
+            )
+            await db.execute("DELETE FROM links WHERE owner_id = ?", (user_id,))
+            await db.execute("DELETE FROM folders WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM action_tokens WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM refresh_tokens WHERE user_id = ?", (user_id,))
+            await db.execute("DELETE FROM two_factor_challenges WHERE user_id = ?", (user_id,))
+            await db.execute(
+                """
+                UPDATE preferences
+                SET theme = 'light',
+                    language = 'ru',
+                    email_notifications = 1,
+                    system_notifications = 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            )
+            await db.commit()
+
     async def list_folders(self, user_id: int) -> list[tuple[FolderRecord, int]]:
         async with self._connect() as db:
             cursor = await db.execute(
@@ -863,13 +979,20 @@ class SQLClient:
     async def delete_folder(self, folder_id: int, user_id: int) -> bool:
         async with self._connect() as db:
             await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                "SELECT 1 FROM folders WHERE id = ? AND user_id = ? LIMIT 1",
+                (folder_id, user_id),
+            )
+            if await cursor.fetchone() is None:
+                await db.rollback()
+                return False
             await db.execute(
                 """
                 UPDATE links
                 SET folder_id = NULL, updated_at = CURRENT_TIMESTAMP
-                WHERE folder_id = ?
+                WHERE folder_id = ? AND owner_id = ?
                 """,
-                (folder_id,),
+                (folder_id, user_id),
             )
             cursor = await db.execute(
                 "DELETE FROM folders WHERE id = ? AND user_id = ?",
@@ -1316,6 +1439,47 @@ class SQLClient:
                 "top_links": [self._link_to_export_dict(link) for link in top_links],
             },
         }
+
+    async def replace_link_analytics(
+        self,
+        link_id: int,
+        *,
+        access_count: int,
+        last_accessed_at: str | None,
+        hourly_counts: dict[str, int],
+        daily_counts: dict[str, int],
+    ) -> None:
+        async with self._connect() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            await db.execute("DELETE FROM analytics_hourly WHERE link_id = ?", (link_id,))
+            await db.execute("DELETE FROM analytics_daily WHERE link_id = ?", (link_id,))
+            await db.execute(
+                """
+                UPDATE links
+                SET access_count = ?,
+                    last_accessed_at = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (access_count, last_accessed_at, link_id),
+            )
+            for bucket_start, count in hourly_counts.items():
+                await db.execute(
+                    """
+                    INSERT INTO analytics_hourly (link_id, bucket_start, count)
+                    VALUES (?, ?, ?)
+                    """,
+                    (link_id, bucket_start, count),
+                )
+            for bucket_start, count in daily_counts.items():
+                await db.execute(
+                    """
+                    INSERT INTO analytics_daily (link_id, bucket_start, count)
+                    VALUES (?, ?, ?)
+                    """,
+                    (link_id, bucket_start, count),
+                )
+            await db.commit()
 
     async def ping(self) -> None:
         async with self._connect() as db:

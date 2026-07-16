@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     public_base_url: HttpUrl = HttpUrl("http://localhost:8000")
     database_path: str = "data/links.db"
     redis_url: str = "redis://localhost:6379/0"
+    rate_limit_prefix: str = "ratelimit"
+    guest_link_rate_limit_requests: int = Field(default=30, ge=1, le=10000)
+    guest_link_rate_limit_window_seconds: int = Field(default=60, ge=1, le=86400)
+    auth_action_rate_limit_requests: int = Field(default=10, ge=1, le=10000)
+    auth_action_rate_limit_window_seconds: int = Field(default=300, ge=1, le=86400)
     cache_ttl_seconds: int = Field(default=3600, ge=1)
     shortcode_length: int = Field(default=8, ge=6, le=32)
     shortcode_max_attempts: int = Field(default=10, ge=1, le=100)
@@ -28,6 +33,7 @@ class Settings(BaseSettings):
     email_2fa_code_minutes: int = Field(default=10, ge=1, le=60)
     email_provider_configured: bool = False
     admin_emails: list[str] = []
+    demo_seed_password: str | None = None
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",

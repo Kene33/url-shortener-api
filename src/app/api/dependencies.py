@@ -10,6 +10,7 @@ from app.db.redis.links import LinkCache
 from app.db.sql.crud import SQLClient, UserRecord
 from app.services.auth import AuthService
 from app.services.links import LinkService
+from app.services.rate_limit import RateLimiter
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -32,6 +33,10 @@ def get_link_service(request: Request) -> LinkService:
 
 def get_auth_service(request: Request) -> AuthService:
     return request.app.state.auth_service
+
+
+def get_rate_limiter(request: Request) -> RateLimiter:
+    return request.app.state.rate_limiter
 
 
 async def get_optional_user(

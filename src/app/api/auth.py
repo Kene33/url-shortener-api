@@ -2,7 +2,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.api.dependencies import get_auth_service, get_current_user, get_settings
+from app.api.dependencies import get_auth_service, get_current_user, get_rate_limiter, get_settings
+from app.api.rate_limit import auth_action_policy, enforce_rate_limit, rate_limit_subject
 from app.core.config import Settings
 from app.core.errors import APIError
 from app.db.sql.crud import UserRecord
@@ -32,11 +33,13 @@ from app.services.auth import (
     IssuedTokens,
     TwoFactorRequiredError,
 )
+from app.services.rate_limit import RateLimiter
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 
 AUTH_RESPONSES = {
     401: {"model": ErrorResponse, "description": "Авторизация не пройдена"},
+    429: {"model": ErrorResponse, "description": "Слишком много запросов"},
     422: {"model": ValidationErrorResponse, "description": "Некорректный запрос"},
     503: {"model": ErrorResponse, "description": "SQLite недоступна"},
 }
@@ -96,9 +99,18 @@ def token_response(tokens: IssuedTokens, settings: Settings) -> TokenResponse:
 @router.post("/auth/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterRequest,
+    request: Request,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> RegisterResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_register"),
+        subject=rate_limit_subject(request, payload.email),
+        response=response,
+    )
     try:
         user, verification_token = await service.register(str(payload.email), payload.password)
     except EmailAlreadyRegisteredError as exc:
@@ -119,9 +131,18 @@ async def register(
 @router.post("/auth/verify-email", response_model=UserResponse)
 async def verify_email(
     payload: VerifyEmailRequest,
+    request: Request,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_verify_email"),
+        subject=rate_limit_subject(request, payload.token),
+        response=response,
+    )
     try:
         user = await service.verify_email(payload.token)
     except InvalidTokenError as exc:
@@ -146,10 +167,18 @@ async def verify_email(
 )
 async def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse | LoginChallengeResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_login"),
+        subject=rate_limit_subject(request, payload.email),
+        response=response,
+    )
     try:
         tokens = await service.authenticate(str(payload.email), payload.password)
     except InvalidCredentialsError as exc:
@@ -183,10 +212,18 @@ async def login(
 @router.post("/auth/2fa/verify", response_model=TokenResponse, responses=AUTH_RESPONSES)
 async def verify_login_two_factor(
     payload: TwoFactorVerifyRequest,
+    request: Request,
     response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_two_factor_verify"),
+        subject=rate_limit_subject(request, payload.login_token),
+        response=response,
+    )
     try:
         tokens = await service.verify_login_two_factor(payload.login_token, payload.code)
     except InvalidTwoFactorCodeError as exc:
@@ -248,9 +285,18 @@ async def logout(
 @router.post("/auth/password-reset/request", response_model=ActionMessageResponse)
 async def request_password_reset(
     payload: PasswordResetRequest,
+    request: Request,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActionMessageResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_password_reset_request"),
+        subject=rate_limit_subject(request, payload.email),
+        response=response,
+    )
     token = await service.request_password_reset(str(payload.email))
     return ActionMessageResponse(
         message="If the account exists, password reset instructions were created",
@@ -261,8 +307,18 @@ async def request_password_reset(
 @router.post("/auth/password-reset/confirm", response_model=ActionMessageResponse)
 async def confirm_password_reset(
     payload: PasswordResetConfirmRequest,
+    request: Request,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActionMessageResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_password_reset_confirm"),
+        subject=rate_limit_subject(request, payload.token),
+        response=response,
+    )
     try:
         await service.reset_password(payload.token, payload.new_password)
     except InvalidTokenError as exc:

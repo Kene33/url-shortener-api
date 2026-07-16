@@ -13,8 +13,10 @@ from app.api.dependencies import (
     get_current_user,
     get_database,
     get_link_service,
+    get_rate_limiter,
     get_settings,
 )
+from app.api.rate_limit import auth_action_policy, enforce_rate_limit, rate_limit_subject
 from app.core.config import Settings
 from app.core.errors import APIError
 from app.core.security import verify_password
@@ -57,12 +59,14 @@ from app.services.auth import (
     InvalidTwoFactorCodeError,
 )
 from app.services.links import LinkService
+from app.services.rate_limit import RateLimiter
 
 router = APIRouter(prefix="/api/v1/me", tags=["profile links"])
 
 PRIVATE_RESPONSES = {
     400: {"model": ErrorResponse},
     401: {"model": ErrorResponse},
+    429: {"model": ErrorResponse},
     404: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
     422: {"model": ValidationErrorResponse},
@@ -344,9 +348,12 @@ async def get_my_link_analytics(
 @router.patch("/profile", response_model=ProfileUpdateResponse, responses=PRIVATE_RESPONSES)
 async def update_profile(
     payload: ProfileUpdateRequest,
+    request: Request,
+    response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
     database: Annotated[SQLClient, Depends(get_database)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ProfileUpdateResponse:
     if not payload.model_fields_set:
@@ -366,6 +373,12 @@ async def update_profile(
         and payload.email
         and payload.email.lower() != user.email.lower()
     ):
+        await enforce_rate_limit(
+            limiter=rate_limiter,
+            policy=auth_action_policy(settings, "auth_profile_email_change"),
+            subject=rate_limit_subject(request, user.id, payload.email),
+            response=response,
+        )
         try:
             token = await auth_service.request_email_change(updated, str(payload.email))
         except EmailAlreadyInUseError as exc:
@@ -475,10 +488,18 @@ async def update_preferences(
 async def change_password(
     payload: ChangePasswordRequest,
     request: Request,
+    response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActionMessageResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_change_password"),
+        subject=rate_limit_subject(request, user.id),
+        response=response,
+    )
     try:
         await auth_service.change_password(
             user,
@@ -513,8 +534,15 @@ async def delete_account(
     response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
     database: Annotated[SQLClient, Depends(get_database)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActionMessageResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_delete_account"),
+        subject=rate_limit_subject(request, user.id),
+        response=response,
+    )
     if not verify_password(user.password_hash, payload.password):
         raise APIError(
             status_code=400, code="current_password_invalid", detail="Password is invalid"
@@ -586,10 +614,19 @@ async def read_all_notifications(
     "/2fa/email/request-enable", response_model=ActionMessageResponse, responses=PRIVATE_RESPONSES
 )
 async def request_enable_email_2fa(
+    request: Request,
+    response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActionMessageResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_enable_email_2fa_request"),
+        subject=rate_limit_subject(request, user.id),
+        response=response,
+    )
     try:
         code = await auth_service.request_enable_email_2fa(user)
     except EmailDeliveryUnavailableError as exc:
@@ -609,9 +646,19 @@ async def request_enable_email_2fa(
 )
 async def confirm_enable_email_2fa(
     payload: TwoFactorCodeRequest,
+    request: Request,
+    response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> TwoFactorStatusResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_enable_email_2fa_confirm"),
+        subject=rate_limit_subject(request, user.id),
+        response=response,
+    )
     try:
         await auth_service.confirm_enable_email_2fa(user, payload.code)
     except InvalidTwoFactorCodeError as exc:
@@ -627,8 +674,18 @@ async def confirm_enable_email_2fa(
     "/2fa/email/disable", response_model=TwoFactorStatusResponse, responses=PRIVATE_RESPONSES
 )
 async def disable_email_2fa(
+    request: Request,
+    response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> TwoFactorStatusResponse:
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_disable_email_2fa"),
+        subject=rate_limit_subject(request, user.id),
+        response=response,
+    )
     await auth_service.disable_email_2fa(user)
     return TwoFactorStatusResponse(enabled=False)
