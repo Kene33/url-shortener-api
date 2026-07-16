@@ -293,6 +293,20 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
     redirect_responses = specification["paths"]["/{shortcode}"]["get"]["responses"]
     assert {"307", "404", "410", "422", "503"} <= set(redirect_responses)
     assert "Location" in redirect_responses["307"]["headers"]
+    assert set(specification["paths"]) == {
+        "/api/v1/links",
+        "/{shortcode}",
+        "/health/live",
+        "/health/ready",
+    }
+    assert specification["info"]["description"].startswith("API первого этапа")
+    assert {tag["name"] for tag in specification["tags"]} == {"links", "health"}
+    create_operation = specification["paths"]["/api/v1/links"]["post"]
+    request_examples = create_operation["requestBody"]["content"]["application/json"][
+        "examples"
+    ]
+    assert request_examples["bare_domain"]["value"] == {"url": "google.com"}
+    assert create_operation["summary"] == "Создать короткую ссылку"
 
 
 def test_settings_reject_invalid_public_base_url():

@@ -17,9 +17,23 @@ SHORTCODE_PATTERN = r"^[A-Za-z0-9]+$"
 
 
 class CreateLinkRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"examples": [{"url": "google.com"}]},
+    )
 
-    url: Annotated[str, Field(min_length=1, max_length=MAX_URL_LENGTH)]
+    url: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=MAX_URL_LENGTH,
+            description=(
+                "Целевой HTTP/HTTPS URL. Для домена без схемы автоматически "
+                "используется HTTPS."
+            ),
+            examples=["google.com", "https://example.com/long/path"],
+        ),
+    ]
 
     @field_validator("url")
     @classmethod
@@ -51,12 +65,26 @@ class CreateLinkRequest(BaseModel):
 
 
 class CreateLinkResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "shortcode": "aB3dE7xQ",
+                "short_url": "http://localhost:8000/aB3dE7xQ",
+                "created": True,
+            }
+        }
+    )
+
     shortcode: Annotated[
         str,
         StringConstraints(min_length=6, max_length=32, pattern=SHORTCODE_PATTERN),
+        Field(description="Зарезервированный код короткой ссылки"),
     ]
-    short_url: HttpUrl
-    created: bool
+    short_url: Annotated[HttpUrl, Field(description="Готовая короткая ссылка")]
+    created: Annotated[
+        bool,
+        Field(description="true для новой ссылки; false при повторном гостевом URL"),
+    ]
 
 
 class ErrorResponse(BaseModel):
@@ -66,20 +94,47 @@ class ErrorResponse(BaseModel):
         "storage_unavailable",
         "shortcode_unavailable",
     ]
-    detail: str
+    detail: Annotated[str, Field(description="Человекочитаемое описание ошибки")]
 
 
 class ValidationErrorResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "code": "validation_error",
+                "detail": "Request validation failed",
+                "errors": [
+                    {
+                        "loc": ["body", "url"],
+                        "msg": "URL input should be a valid URL",
+                        "type": "url_parsing",
+                    }
+                ],
+            }
+        }
+    )
+
     code: Literal["validation_error"]
     detail: str
     errors: list[dict[str, Any]]
 
 
 class LivenessResponse(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {"status": "ok"}})
+
     status: Literal["ok"]
 
 
 class ReadinessResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"status": "ok", "database": "up", "cache": "up"},
+                {"status": "degraded", "database": "up", "cache": "down"},
+            ]
+        }
+    )
+
     status: Literal["ok", "degraded", "unavailable"]
     database: Literal["up", "down"]
     cache: Literal["up", "down", "unknown"]

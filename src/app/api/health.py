@@ -11,7 +11,17 @@ from app.schemas.links import LivenessResponse, ReadinessResponse
 router = APIRouter(prefix="/health", tags=["health"])
 
 
-@router.get("/live", response_model=LivenessResponse, operation_id="health_liveness")
+@router.get(
+    "/live",
+    response_model=LivenessResponse,
+    summary="Проверить работу процесса",
+    description=(
+        "Возвращает `200`, если процесс API запущен. Проверка не обращается "
+        "к SQLite или Redis."
+    ),
+    response_description="Процесс API работает",
+    operation_id="health_liveness",
+)
 async def liveness() -> LivenessResponse:
     return LivenessResponse(status="ok")
 
@@ -19,6 +29,13 @@ async def liveness() -> LivenessResponse:
 @router.get(
     "/ready",
     response_model=ReadinessResponse,
+    summary="Проверить готовность сервиса",
+    description=(
+        "Проверяет обязательную SQLite и необязательный Redis. Недоступный Redis "
+        "даёт состояние `degraded` с кодом `200`; недоступная SQLite — "
+        "`unavailable` с кодом `503`."
+    ),
+    response_description="SQLite доступна; Redis может быть доступен или degraded",
     operation_id="health_readiness",
     responses={
         503: {

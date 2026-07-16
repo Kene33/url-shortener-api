@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, Response, status
 from fastapi.responses import RedirectResponse
 
 from app.api.dependencies import get_link_service, get_settings
@@ -19,19 +21,87 @@ router = APIRouter(tags=["links"])
     "/api/v1/links",
     response_model=CreateLinkResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Создать короткую ссылку",
+    description=(
+        "Принимает полный HTTP/HTTPS URL или домен без схемы. Домен без схемы "
+        "автоматически получает `https://`. Одинаковые нормализованные гостевые "
+        "URL используют один shortcode."
+    ),
+    response_description="Новая гостевая короткая ссылка",
     operation_id="create_short_link",
     responses={
-        200: {"model": CreateLinkResponse, "description": "Existing guest link"},
-        409: {"model": ErrorResponse, "description": "Link is disabled"},
-        422: {"model": ValidationErrorResponse, "description": "Invalid request"},
+        200: {
+            "model": CreateLinkResponse,
+            "description": "Гостевая ссылка уже существовала",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "shortcode": "aB3dE7xQ",
+                        "short_url": "http://localhost:8000/aB3dE7xQ",
+                        "created": False,
+                    }
+                }
+            },
+        },
+        409: {
+            "model": ErrorResponse,
+            "description": "URL зарезервирован отключённой ссылкой",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "link_disabled",
+                        "detail": "This destination is reserved by a disabled link",
+                    }
+                }
+            },
+        },
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Запрос или URL не прошёл валидацию",
+        },
         503: {
             "model": ErrorResponse,
-            "description": "Storage or shortcode allocation unavailable",
+            "description": "SQLite недоступна или shortcode не удалось выделить",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "storage_unavailable": {
+                            "summary": "SQLite недоступна",
+                            "value": {
+                                "code": "storage_unavailable",
+                                "detail": "Storage is temporarily unavailable",
+                            },
+                        },
+                        "shortcode_unavailable": {
+                            "summary": "Не удалось выделить shortcode",
+                            "value": {
+                                "code": "shortcode_unavailable",
+                                "detail": "A short link could not be created",
+                            },
+                        },
+                    }
+                }
+            },
         },
     },
 )
 async def create_link(
-    payload: CreateLinkRequest,
+    payload: Annotated[
+        CreateLinkRequest,
+        Body(
+            openapi_examples={
+                "bare_domain": {
+                    "summary": "Домен без схемы",
+                    "description": "Будет обработан как https://google.com/",
+                    "value": {"url": "google.com"},
+                },
+                "full_url": {
+                    "summary": "Полный HTTPS URL",
+                    "value": {"url": "https://example.com/long/path"},
+                },
+            }
+        ),
+    ],
     response: Response,
     service: LinkService = Depends(get_link_service),
     settings: Settings = Depends(get_settings),
@@ -57,10 +127,15 @@ async def create_link(
 @router.get(
     "/{shortcode}",
     response_class=RedirectResponse,
+    summary="Перейти по короткой ссылке",
+    description=(
+        "Возвращает временный редирект `307` на неизменяемый целевой URL и "
+        "атомарно увеличивает внутренний счётчик переходов."
+    ),
     operation_id="resolve_short_link",
     responses={
         307: {
-            "description": "Redirect to the immutable destination URL",
+            "description": "Редирект на неизменяемый целевой URL",
             "headers": {
                 "Location": {
                     "description": "Destination URL",
@@ -68,10 +143,32 @@ async def create_link(
                 }
             },
         },
-        404: {"model": ErrorResponse, "description": "Link not found"},
-        410: {"model": ErrorResponse, "description": "Link disabled"},
-        422: {"model": ValidationErrorResponse, "description": "Invalid path"},
-        503: {"model": ErrorResponse, "description": "Storage unavailable"},
+        404: {
+            "model": ErrorResponse,
+            "description": "Shortcode не найден",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "link_not_found",
+                        "detail": "Short link not found",
+                    }
+                }
+            },
+        },
+        410: {
+            "model": ErrorResponse,
+            "description": "Ссылка временно отключена",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "code": "link_disabled",
+                        "detail": "Short link is disabled",
+                    }
+                }
+            },
+        },
+        422: {"model": ValidationErrorResponse, "description": "Некорректный путь"},
+        503: {"model": ErrorResponse, "description": "SQLite недоступна"},
     },
 )
 async def resolve_link(

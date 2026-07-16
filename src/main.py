@@ -55,7 +55,26 @@ def create_app(
 
     application = FastAPI(
         title=app_settings.app_name,
+        description=(
+            "API первого этапа URL Shortener: гостевое создание коротких ссылок, "
+            "неизменяемый редирект и проверка состояния сервиса. Аккаунты, личный "
+            "кабинет и пользовательская статистика относятся к следующим этапам."
+        ),
         version="1.0.0",
+        openapi_tags=[
+            {
+                "name": "links",
+                "description": (
+                    "Создание гостевых коротких ссылок и переход по shortcode. "
+                    "Домен без схемы автоматически получает HTTPS."
+                ),
+            },
+            {
+                "name": "health",
+                "description": "Проверки работоспособности API, SQLite и Redis.",
+            },
+        ],
+        license_info={"name": "MIT"},
         lifespan=lifespan,
     )
     application.include_router(api_router)
