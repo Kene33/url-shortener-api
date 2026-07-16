@@ -7,6 +7,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import type { Language, ThemePreference } from "@/api/types";
+import i18n from "@/i18n";
 
 const STORAGE_KEY = "linkcutter.preferences";
 
@@ -49,6 +50,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     document.documentElement.dataset.theme = resolvedTheme;
     document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme, language }));
+    void i18n.changeLanguage(language);
   }, [theme, language, resolvedTheme]);
 
   const value = useMemo(
