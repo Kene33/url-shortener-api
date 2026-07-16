@@ -5,10 +5,11 @@ export const profileKeys = {
   all: ["profile"] as const,
 };
 
-export function useProfileQuery() {
+export function useProfileQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: profileKeys.all,
     queryFn: api.getProfile,
+    enabled: options?.enabled ?? true,
   });
 }
 

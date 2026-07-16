@@ -1,5 +1,7 @@
 import * as Avatar from "@radix-ui/react-avatar";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ export function ProfilePage() {
   const updateProfile = useUpdateProfileMutation();
   const uploadAvatar = useUploadAvatarMutation();
   const deleteAvatar = useDeleteAvatarMutation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     values: {
@@ -38,24 +41,36 @@ export function ProfilePage() {
         <h1 className="m-0 text-lg font-semibold">Профиль</h1>
         <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
           <div className="space-y-3">
-            <Avatar.Root className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/10 text-xl font-semibold text-accent">
+            <Avatar.Root className="flex h-24 w-24 items-center justify-center rounded-full bg-accent/10 text-xl font-semibold text-accent ring-4 ring-accent/10">
               <Avatar.Image src={user.avatar_url ?? undefined} alt={user.display_name ?? user.email} className="h-full w-full rounded-full object-cover" />
               <Avatar.Fallback>{getInitials(user.display_name ?? user.email)}</Avatar.Fallback>
             </Avatar.Root>
-            <label className="block">
-              <span className="mb-2 block text-xs text-subtle">Avatar</span>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void uploadAvatar.mutateAsync(file);
-                }}
-              />
-            </label>
-            <Button variant="secondary" onClick={() => void deleteAvatar.mutateAsync()}>
-              Удалить avatar
-            </Button>
+            <input
+              ref={fileInputRef}
+              className="sr-only"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void uploadAvatar.mutateAsync(file);
+                event.target.value = "";
+              }}
+            />
+            <div className="space-y-2">
+              <p className="m-0 text-xs text-subtle">PNG, JPG или WebP до 2 МБ</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadAvatar.isPending}>
+                  {uploadAvatar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                  {uploadAvatar.isPending ? "Загрузка…" : "Выбрать фото"}
+                </Button>
+                {user.avatar_url && (
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void deleteAvatar.mutateAsync()} disabled={deleteAvatar.isPending}>
+                    {deleteAvatar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Удалить
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
           <form
             className="space-y-4"
