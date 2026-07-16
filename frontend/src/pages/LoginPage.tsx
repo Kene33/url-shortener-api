@@ -30,9 +30,9 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title={t("loginTitle")}
-      subtitle={t("loginSubtitle")}
-      footer={<AuthFooter question={t("noAccount")} action={t("registerAction")} to="/register" />}
+      title={t("auth.loginTitle")}
+      subtitle={t("auth.loginSubtitle")}
+      footer={<AuthFooter question={t("auth.noAccount")} action={t("auth.registerAction")} to="/register" />}
     >
       {!challenge ? (
         <form
@@ -52,12 +52,12 @@ export function LoginPage() {
           })}
         >
           <Input placeholder="Email" type="email" {...form.register("email")} />
-          <Input placeholder={t("password")} type="password" {...form.register("password")} />
+          <Input placeholder={t("common.password")} type="password" {...form.register("password")} />
           <Button type="submit" className="w-full">
-            {t("login")}
+            {t("auth.loginAction")}
           </Button>
           <Link to="/forgot-password" className="block text-sm text-accent">
-            {t("forgotPassword")}
+            {t("auth.forgotPassword")}
           </Link>
           {error ? <StatusMessage type="error" message={error} /> : null}
         </form>
@@ -74,10 +74,10 @@ export function LoginPage() {
             }
           })}
         >
-          <Input placeholder={t("twoFactorCode")} {...codeForm.register("code")} />
+          <Input placeholder={t("auth.twoFactorCode")} {...codeForm.register("code")} />
           {challenge.debugCode ? <StatusMessage type="success" message={`Dev code: ${challenge.debugCode}`} /> : null}
           <Button type="submit" className="w-full">
-            {t("confirm")}
+            {t("common.confirm")}
           </Button>
           {error ? <StatusMessage type="error" message={error} /> : null}
         </form>

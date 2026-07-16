@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/app/logo";
 import { ThemeLanguageControls } from "@/components/app/theme-language-controls";
@@ -15,12 +16,13 @@ export function AuthLayout({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="page-shell flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-[440px] space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Link to="/" className="pill" aria-label="Вернуться на главную" title="Вернуться на главную">
+            <Link to="/" className="pill" aria-label={t("auth.backHome")} title={t("auth.backHome")}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <Logo />

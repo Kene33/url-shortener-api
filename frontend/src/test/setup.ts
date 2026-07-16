@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom";
 import { cleanup } from "@testing-library/react";
+import i18n from "@/i18n";
 
 function createStorage(): Storage {
   const store = new Map<string, string>();
@@ -26,6 +27,23 @@ function createStorage(): Storage {
 }
 
 const storage = createStorage();
+function installMatchMedia() {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes("dark"),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
 Object.defineProperty(window, "localStorage", {
   value: storage,
   configurable: true,
@@ -34,22 +52,12 @@ Object.defineProperty(globalThis, "localStorage", {
   value: storage,
   configurable: true,
 });
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: query.includes("dark"),
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+installMatchMedia();
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   window.localStorage.clear();
   vi.restoreAllMocks();
+  installMatchMedia();
+  await i18n.changeLanguage("ru");
 });

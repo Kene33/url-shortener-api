@@ -28,9 +28,9 @@ export function RegisterPage() {
 
   return (
     <AuthLayout
-      title={t("register")}
-      subtitle={t("registerSubtitle")}
-      footer={<AuthFooter question={t("hasAccount")} action={t("login")} to="/login" />}
+      title={t("auth.registerTitle")}
+      subtitle={t("auth.registerSubtitle")}
+      footer={<AuthFooter question={t("auth.hasAccount")} action={t("auth.loginAction")} to="/login" />}
     >
       <form
         className="space-y-4"
@@ -50,10 +50,10 @@ export function RegisterPage() {
         })}
       >
         <Input placeholder="Email" type="email" {...form.register("email")} />
-        <Input placeholder={t("password")} type="password" {...form.register("password")} />
-        <Input placeholder={t("confirmPassword")} type="password" {...form.register("confirmPassword")} />
+        <Input placeholder={t("common.password")} type="password" {...form.register("password")} />
+        <Input placeholder={t("common.confirmPassword")} type="password" {...form.register("confirmPassword")} />
         <Button type="submit" className="w-full">
-          {t("registerAction")}
+          {t("auth.registerAction")}
         </Button>
         {message ? <StatusMessage type="success" message={message} /> : null}
         {error ? <StatusMessage type="error" message={error} /> : null}

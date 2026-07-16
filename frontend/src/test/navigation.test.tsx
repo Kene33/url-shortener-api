@@ -17,9 +17,9 @@ describe("guest navigation", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Сокращайте ссылки быстро и просто")).toBeInTheDocument();
+    expect(await screen.findByText("Сокращайте ссылки без лишних шагов")).toBeInTheDocument();
     expect(screen.getByText("Войти")).toBeInTheDocument();
-    expect(screen.getByText("Регистрация")).toBeInTheDocument();
+    expect(screen.getByText("Создать аккаунт")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText("Мои ссылки")).not.toBeInTheDocument();
     });

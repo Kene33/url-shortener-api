@@ -6,9 +6,9 @@ import { useTheme } from "@/features/theme/theme-provider";
 import type { Language, StoredTheme, ThemePreference } from "@/api/types";
 
 export function ThemeLanguageControls() {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { user } = useSession();
-  const { language, resolvedTheme, theme, setLanguage, setTheme } = useTheme();
+  const { language, resolvedTheme, setLanguage, setTheme } = useTheme();
 
   const sync = (next: { theme?: ThemePreference; language?: Language }) => {
     if (user) {
@@ -33,6 +33,8 @@ export function ThemeLanguageControls() {
       <button
         type="button"
         className="pill"
+        aria-label={t("theme.switchLanguage")}
+        title={t("theme.switchLanguage")}
         onClick={() => {
           setLanguage(nextLanguage);
           void i18n.changeLanguage(nextLanguage);
@@ -46,7 +48,8 @@ export function ThemeLanguageControls() {
         type="button"
         className="pill"
         onClick={toggleTheme}
-        aria-label={`Switch theme from ${theme}`}
+        aria-label={resolvedTheme === "dark" ? t("theme.switchThemeToLight") : t("theme.switchThemeToDark")}
+        title={resolvedTheme === "dark" ? t("theme.switchThemeToLight") : t("theme.switchThemeToDark")}
       >
         {resolvedTheme === "dark" ? <SunMedium className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
       </button>

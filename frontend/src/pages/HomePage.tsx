@@ -37,10 +37,10 @@ export function HomePage() {
             <Logo />
             <div className="flex items-center gap-2">
               <Link to="/login" className="inline-flex h-9 items-center justify-center rounded-panel border border-border bg-panel px-4 text-sm font-medium text-text transition hover:bg-muted">
-                {t("login")}
+                {t("home.login")}
               </Link>
               <Link to="/register" className="inline-flex h-9 items-center justify-center rounded-panel border border-accent bg-accent px-4 text-sm font-medium text-white transition hover:opacity-95">
-                {t("register")}
+                {t("home.register")}
               </Link>
               <ThemeLanguageControls />
             </div>
@@ -50,37 +50,37 @@ export function HomePage() {
           <Card className="space-y-6 p-6 md:p-10">
             <div className="space-y-3 text-center md:text-left">
               <h1 className="m-0 max-w-xl text-3xl font-semibold tracking-tight md:text-4xl">
-                {t("shortener")}
+                {t("home.title")}
               </h1>
               <p className="m-0 max-w-lg text-sm text-subtle">
-                {t("shortenerHint")}
+                {t("home.hint")}
               </p>
             </div>
             <form
               className="space-y-4"
               onSubmit={form.handleSubmit((values) =>
-                mutation.mutate({ url: values.url, mode: user ? "new" : "reuse" }),
+                mutation.mutate({ url: values.url, mode: "reuse" }),
               )}
             >
               <div className="flex flex-col gap-3 md:flex-row">
                 <Input
                   aria-label="URL input"
-                  placeholder={t("urlPlaceholder")}
+                  placeholder={t("home.urlPlaceholder")}
                   {...form.register("url")}
                 />
                 <Button type="submit" className="md:min-w-36">
-                  {t("shorten")}
+                  {t("home.shorten")}
                 </Button>
               </div>
               {result ? (
                 <div className="panel-soft flex items-center justify-between gap-3 p-3" aria-live="polite">
                   <span className="min-w-0 truncate">{result}</span>
                   <Button variant="secondary" size="sm" onClick={() => void copyToClipboard(result)} type="button">
-                    {t("copy")}
+                    {t("common.copy")}
                   </Button>
                 </div>
               ) : null}
-              {mutation.isPending ? <StatusMessage type="loading" message={t("creatingLink")} /> : null}
+              {mutation.isPending ? <StatusMessage type="loading" message={t("home.creatingLink")} /> : null}
               {mutation.error ? (
                 <StatusMessage type="error" message={mutation.error.message} />
               ) : null}
@@ -92,20 +92,20 @@ export function HomePage() {
                     <UserRoundPlus className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="m-0 text-sm font-medium">{t("accountPromptTitle")}</p>
-                    <p className="m-0 mt-1 text-xs leading-5 text-subtle">{t("accountPromptDescription")}</p>
+                    <p className="m-0 text-sm font-medium">{t("home.accountTitle")}</p>
+                    <p className="m-0 mt-1 text-xs leading-5 text-subtle">{t("home.accountDescription")}</p>
                   </div>
                 </div>
                 <Link to="/register" className="inline-flex h-9 shrink-0 items-center justify-center rounded-panel border border-border bg-panel px-4 text-sm font-medium text-text transition hover:bg-muted">
-                  {t("accountPromptAction")}
+                  {t("home.accountAction")}
                 </Link>
               </div>
             )}
             <div className="grid gap-3 md:grid-cols-3">
               {[
-                { icon: Zap, title: t("instant"), text: t("instantHint") },
-                { icon: ShieldCheck, title: t("secure"), text: t("secureHint") },
-                { icon: ChartNoAxesColumn, title: t("insightful"), text: t("insightfulHint") },
+                { icon: Zap, title: t("home.instant"), text: t("home.instantHint") },
+                { icon: ShieldCheck, title: t("home.secure"), text: t("home.secureHint") },
+                { icon: ChartNoAxesColumn, title: t("home.insights"), text: t("home.insightsHint") },
               ].map(({ icon: Icon, title, text }) => (
                 <div key={title} className="panel-soft space-y-3 p-4">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">

@@ -1,7 +1,23 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bell, FolderKanban, Home, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, User2, X } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  FolderKanban,
+  Home,
+  LayoutDashboard,
+  Link2,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  Shield,
+  User2,
+  Users,
+  X,
+} from "lucide-react";
 import type { PropsWithChildren } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -11,42 +27,68 @@ import { useSession } from "@/features/session/session-provider";
 import { useProfileQuery } from "@/features/profile/api";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { to: "/", label: "home", icon: Home },
-  { to: "/links", label: "yourLinks", icon: LayoutDashboard },
-  { to: "/analytics", label: "analytics", icon: Bell },
-  { to: "/folders", label: "folders", icon: FolderKanban },
-  { to: "/settings", label: "settings", icon: Settings },
-  { to: "/profile", label: "profile", icon: User2 },
-  { to: "/notifications", label: "notifications", icon: Bell },
-];
-
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { logout } = useSession();
+  const { logout, user } = useSession();
   const { t } = useTranslation();
+
+  const primaryLinks = useMemo(
+    () => [
+      { to: "/", label: t("common.home"), icon: Home },
+      { to: "/links", label: t("nav.links"), icon: LayoutDashboard },
+      { to: "/analytics", label: t("nav.analytics"), icon: BarChart3 },
+      { to: "/folders", label: t("nav.folders"), icon: FolderKanban },
+      { to: "/settings", label: t("nav.settings"), icon: Settings },
+      { to: "/profile", label: t("nav.profile"), icon: User2 },
+      { to: "/notifications", label: t("nav.notifications"), icon: Bell },
+    ],
+    [t],
+  );
+
+  const adminLinks = useMemo(
+    () => [
+      { to: "/admin", label: t("nav.admin"), icon: Shield },
+      { to: "/admin/users", label: t("nav.adminUsers"), icon: Users },
+      { to: "/admin/links", label: t("nav.adminLinks"), icon: Link2 },
+      { to: "/admin/settings", label: t("nav.adminSettings"), icon: Settings },
+    ],
+    [t],
+  );
+
+  const renderLink = (to: string, label: string, Icon: typeof Home) => (
+    <NavLink
+      key={to}
+      to={to}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-3 rounded-panel px-3 py-2 text-sm text-subtle transition hover:bg-muted hover:text-text",
+          isActive && "bg-accent/10 text-accent",
+        )
+      }
+    >
+      <Icon className="h-4 w-4" />
+      <span>{label}</span>
+    </NavLink>
+  );
+
   return (
     <div className="flex h-full flex-col gap-6">
       <Logo />
-      <nav className="flex flex-1 flex-col gap-1">
-        {links.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-panel px-3 py-2 text-sm text-subtle transition hover:bg-muted hover:text-text",
-                isActive && "bg-accent/10 text-accent",
-              )
-            }
-          >
-            <Icon className="h-4 w-4" />
-            <span>{t(label)}</span>
-          </NavLink>
-        ))}
+      <nav className="flex flex-1 flex-col gap-5">
+        <div className="flex flex-col gap-1">
+          {primaryLinks.map(({ to, label, icon }) => renderLink(to, label, icon))}
+        </div>
+        {user?.is_admin ? (
+          <div className="flex flex-col gap-1">
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">
+              {t("nav.adminSection")}
+            </p>
+            {adminLinks.map(({ to, label, icon }) => renderLink(to, label, icon))}
+          </div>
+        ) : null}
       </nav>
       <Button variant="ghost" className="justify-start" onClick={() => void logout()}>
-        {t("logout")}
+        {t("shell.logout")}
       </Button>
     </div>
   );
@@ -74,19 +116,24 @@ export function AppShell({ children }: PropsWithChildren) {
             <div className="flex items-center gap-3 lg:hidden">
               <Dialog.Root open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
                 <Dialog.Trigger asChild>
-                  <button type="button" className="pill" aria-label="Открыть навигацию" title="Открыть навигацию">
+                  <button type="button" className="pill" aria-label={t("shell.openNav")} title={t("shell.openNav")}>
                     <Menu className="h-4 w-4" />
                   </button>
                 </Dialog.Trigger>
                 <Dialog.Portal>
                   <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 data-[state=closed]:opacity-0 data-[state=open]:opacity-100" />
                   <Dialog.Content className="fixed left-0 top-0 z-50 h-full w-[min(84vw,320px)] border-r border-border bg-panel p-4 shadow-panel outline-none transition-transform duration-200 data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0">
-                    <Dialog.Title className="sr-only">Навигация LinkCutter</Dialog.Title>
-                    <Dialog.Description className="sr-only">Переход между разделами аккаунта</Dialog.Description>
+                    <Dialog.Title className="sr-only">{t("shell.mobileTitle")}</Dialog.Title>
+                    <Dialog.Description className="sr-only">{t("shell.mobileDescription")}</Dialog.Description>
                     <div className="mb-4 flex items-center justify-between">
                       <Logo />
                       <Dialog.Close asChild>
-                        <button type="button" className="pill" aria-label="Закрыть навигацию" title="Закрыть навигацию">
+                        <button
+                          type="button"
+                          className="pill"
+                          aria-label={t("shell.closeNav")}
+                          title={t("shell.closeNav")}
+                        >
                           <X className="h-4 w-4" />
                         </button>
                       </Dialog.Close>
@@ -101,15 +148,15 @@ export function AppShell({ children }: PropsWithChildren) {
               <button
                 type="button"
                 className="pill !h-9 !w-9 !justify-center !p-0"
-                aria-label={sidebarOpen ? t("hideSidebar") : t("showSidebar")}
-                title={sidebarOpen ? t("hideSidebar") : t("showSidebar")}
+                aria-label={sidebarOpen ? t("shell.hideSidebar") : t("shell.showSidebar")}
+                title={sidebarOpen ? t("shell.hideSidebar") : t("shell.showSidebar")}
                 onClick={() => setSidebarOpen((open) => !open)}
               >
                 {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
               </button>
               <div>
-                <p className="m-0 text-base font-extrabold uppercase tracking-[0.14em] text-text">LinkCutter</p>
-                <p className="m-0 mt-1 text-sm text-subtle">{t("shellHint")}</p>
+                <p className="m-0 text-base font-extrabold uppercase tracking-[0.14em] text-text">{t("common.brand")}</p>
+                <p className="m-0 mt-1 text-sm text-subtle">{t("shell.hint")}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -117,8 +164,8 @@ export function AppShell({ children }: PropsWithChildren) {
               <NavLink
                 to="/profile"
                 className="hidden items-center gap-2 rounded-full border border-border bg-panel py-1 pl-1 pr-3 transition hover:border-accent/50 hover:bg-muted lg:flex"
-                aria-label="Открыть профиль"
-                title="Открыть профиль"
+                aria-label={t("shell.openProfile")}
+                title={t("shell.openProfile")}
               >
                 <Avatar user={profile.data?.user ?? user} />
                 <span className="max-w-[150px] truncate text-xs font-medium text-text">
@@ -130,8 +177,8 @@ export function AppShell({ children }: PropsWithChildren) {
                 variant="ghost"
                 size="sm"
                 className="hidden !h-9 !w-9 !p-0 lg:inline-flex"
-                aria-label="Выйти"
-                title="Выйти"
+                aria-label={t("shell.logout")}
+                title={t("shell.logout")}
                 onClick={() => void logout()}
               >
                 <LogOut className="h-4 w-4" />

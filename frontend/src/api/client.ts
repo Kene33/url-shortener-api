@@ -1,5 +1,11 @@
 import type {
   ActionMessageResponse,
+  AdminLinkListResponse,
+  AdminLinkUpdatePayload,
+  AdminSettingsResponse,
+  AdminSettingsUpdatePayload,
+  AdminUserListResponse,
+  AdminUserUpdatePayload,
   AnalyticsPeriod,
   AnalyticsResponse,
   ApiErrorPayload,
@@ -13,21 +19,23 @@ import type {
   NotificationListResponse,
   Preferences,
   ProfileResponse,
+  ProfileUpdateResponse,
   RegisterResponse,
   SessionResponse,
   TwoFactorChallengeResponse,
   UpdateLinkPayload,
   User,
 } from "@/api/types";
+import i18n from "@/i18n";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
+const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 export class ApiError extends Error {
   status: number;
   payload?: ApiErrorPayload;
 
-  constructor(status: number, payload?: ApiErrorPayload) {
-    super(payload?.detail ?? `Request failed with status ${status}`);
+  constructor(status: number, payload?: ApiErrorPayload, message?: string) {
+    super(message ?? payload?.detail ?? i18n.t("errors.httpStatus", { status }));
     this.status = status;
     this.payload = payload;
   }
@@ -40,6 +48,32 @@ let getAccessToken: SessionGetter = () => null;
 let setAccessToken: SessionSetter = () => undefined;
 let refreshHandler: (() => Promise<string | null>) | null = null;
 let refreshInFlight: Promise<string | null> | null = null;
+
+function getValidationField(loc?: Array<string | number>) {
+  const field = loc?.[loc.length - 1];
+  if (typeof field !== "string") {
+    return i18n.t("common.notSet");
+  }
+  return i18n.t(`errors.field.${field}`, { defaultValue: field });
+}
+
+function getApiErrorMessage(status: number, payload?: ApiErrorPayload) {
+  if (payload?.code) {
+    const key = `errors.code.${payload.code}`;
+    if (i18n.exists(key)) {
+      return i18n.t(key);
+    }
+  }
+  if (payload?.errors?.length) {
+    return i18n.t("errors.validation", {
+      field: getValidationField(payload.errors[0].loc),
+    });
+  }
+  if (payload?.detail) {
+    return payload.detail;
+  }
+  return i18n.t("errors.httpStatus", { status });
+}
 
 export function configureApiAuth(options: {
   getToken: SessionGetter;
@@ -90,7 +124,7 @@ export async function apiRequest<T>(
     } catch {
       payload = undefined;
     }
-    throw new ApiError(response.status, payload);
+    throw new ApiError(response.status, payload, getApiErrorMessage(response.status, payload));
   }
   return parseResponse<T>(response);
 }
@@ -132,7 +166,7 @@ export const api = {
     return { user, preferences };
   },
   updateProfile: (payload: Partial<{ display_name: string; email: string }>) =>
-    apiRequest<User>("/api/v1/me/profile", { method: "PATCH", body: JSON.stringify(payload) }),
+    apiRequest<ProfileUpdateResponse>("/api/v1/me/profile", { method: "PATCH", body: JSON.stringify(payload) }),
   uploadAvatar: (file: File) => {
     const data = new FormData();
     data.append("file", file);
@@ -168,4 +202,30 @@ export const api = {
   exportData: () => apiRequest<ExportResponse>("/api/v1/me/export"),
   deleteAccount: (password: string) =>
     apiRequest<ActionMessageResponse>("/api/v1/me", { method: "DELETE", body: JSON.stringify({ password }) }),
+  getAdminUsers: (params: { limit: number; offset: number }) => {
+    const search = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+    });
+    return apiRequest<AdminUserListResponse>(`/api/v1/admin/users?${search.toString()}`);
+  },
+  updateAdminUser: (userId: number, payload: AdminUserUpdatePayload) =>
+    apiRequest<User>(`/api/v1/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  getAdminLinks: (params: { owner_id?: string; is_active?: string; limit: number; offset: number }) => {
+    const search = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+    });
+    if (params.owner_id) search.set("owner_id", params.owner_id);
+    if (params.is_active) search.set("is_active", params.is_active);
+    return apiRequest<AdminLinkListResponse>(`/api/v1/admin/links?${search.toString()}`);
+  },
+  updateAdminLink: (shortcode: string, payload: AdminLinkUpdatePayload) =>
+    apiRequest(`/api/v1/admin/links/${shortcode}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  getAdminSettings: () => apiRequest<AdminSettingsResponse>("/api/v1/admin/settings"),
+  updateAdminSettings: (payload: AdminSettingsUpdatePayload) =>
+    apiRequest<AdminSettingsResponse>("/api/v1/admin/settings", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
 };

@@ -17,7 +17,12 @@ export function useUpdateProfileMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: api.updateProfile,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ["session", "profile"] }),
+      ]);
+    },
   });
 }
 
@@ -25,7 +30,12 @@ export function useUploadAvatarMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: api.uploadAvatar,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ["session", "profile"] }),
+      ]);
+    },
   });
 }
 
@@ -33,6 +43,11 @@ export function useDeleteAvatarMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: api.deleteAvatar,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ["session", "profile"] }),
+      ]);
+    },
   });
 }

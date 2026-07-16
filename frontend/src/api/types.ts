@@ -30,6 +30,14 @@ export type AnalyticsResponse = ApiSchema["AnalyticsResponse"];
 export type NotificationItem = ApiSchema["NotificationResponse"];
 export type NotificationListResponse = ApiSchema["NotificationListResponse"];
 export type ExportResponse = ApiSchema["ExportResponse"];
+export type AdminUserListResponse = ApiSchema["AdminUserListResponse"];
+export type AdminUserUpdatePayload = ApiSchema["AdminUserUpdateRequest"];
+export type AdminLinkItem = ApiSchema["AdminLinkResponse"];
+export type AdminLinkListResponse = ApiSchema["AdminLinkListResponse"];
+export type AdminLinkUpdatePayload = ApiSchema["AdminLinkUpdateRequest"];
+export type AdminSettingsResponse = ApiSchema["AdminSettingsResponse"];
+export type AdminSettingsUpdatePayload = ApiSchema["AdminSettingsUpdateRequest"];
+export type ProfileUpdateResponse = ApiSchema["ProfileUpdateResponse"];
 
 export interface ProfileResponse {
   user: User;
