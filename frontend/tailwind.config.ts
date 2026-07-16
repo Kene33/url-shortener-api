@@ -27,12 +27,6 @@ const config: Config = {
         panel: "0 18px 48px rgba(18, 24, 38, 0.08)",
         dark: "0 18px 48px rgba(0, 0, 0, 0.36)",
       },
-      backgroundImage: {
-        "grid-light":
-          "radial-gradient(circle at top left, rgba(98,72,255,0.08), transparent 24%), linear-gradient(180deg, rgba(255,255,255,0.96), rgba(243,246,255,0.9))",
-        "grid-dark":
-          "radial-gradient(circle at top left, rgba(114,87,255,0.24), transparent 24%), linear-gradient(180deg, rgba(10,14,24,0.98), rgba(12,17,29,0.96))",
-      },
     },
   },
   plugins: [],
