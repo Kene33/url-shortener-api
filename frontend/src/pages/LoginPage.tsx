@@ -39,8 +39,8 @@ export function LoginPage() {
             setError(null);
             try {
               const result = await login(values);
-              if (result?.two_factor_required) {
-                setChallenge({ token: result.challenge_token, debugCode: result.debug_code });
+              if (result?.requires_two_factor) {
+                setChallenge({ token: result.login_token, debugCode: result.debug_code });
                 return;
               }
               navigate("/links");
@@ -65,7 +65,7 @@ export function LoginPage() {
           onSubmit={codeForm.handleSubmit(async ({ code }) => {
             setError(null);
             try {
-              await verifyTwoFactor({ challenge_token: challenge.token, code });
+              await verifyTwoFactor({ login_token: challenge.token, code });
               navigate("/links");
             } catch (nextError) {
               setError(nextError instanceof Error ? nextError.message : "Verification failed");

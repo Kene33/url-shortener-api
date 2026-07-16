@@ -71,10 +71,10 @@ export function ProfilePage() {
       </Card>
       <Card className="grid gap-3 md:grid-cols-2">
         {[
-          ["Статус", user.status ?? (user.is_active ? "active" : "disabled")],
-          ["Роль", user.role ?? (user.is_admin ? "admin" : "user")],
+          ["Статус", user.is_active ? "active" : "disabled"],
+          ["Роль", user.is_admin ? "admin" : "user"],
           ["Дата регистрации", formatDate(user.created_at)],
-          ["Последний вход", formatDate(user.last_login_at)],
+          ["Ожидающий email", user.pending_email ?? "—"],
         ].map(([label, value]) => (
           <div key={String(label)} className="panel-soft p-4">
             <p className="m-0 text-xs text-subtle">{label}</p>

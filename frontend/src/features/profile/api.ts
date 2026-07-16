@@ -8,7 +8,7 @@ export const profileKeys = {
 export function useProfileQuery() {
   return useQuery({
     queryKey: profileKeys.all,
-    queryFn: api.me,
+    queryFn: api.getProfile,
   });
 }
 

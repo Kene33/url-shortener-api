@@ -37,24 +37,28 @@ export function AnalyticsPage() {
       {analytics.data ? (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            {analytics.data.metrics.map((metric) => (
-              <Card key={metric.key} className="space-y-2">
-                <p className="m-0 text-xs text-subtle">{metric.label}</p>
-                <p className="m-0 text-2xl font-semibold">{metric.value}</p>
-                <p className="m-0 text-xs text-success">{metric.change ? `${metric.change}%` : "No change"}</p>
+            {[
+              ["Переходы", analytics.data.summary.total_clicks],
+              ["Активные ссылки", analytics.data.summary.active_links],
+              ["Среднее на ссылку", analytics.data.summary.avg_clicks_per_link],
+            ].map(([label, value]) => (
+              <Card key={String(label)} className="space-y-2">
+                <p className="m-0 text-xs text-subtle">{label}</p>
+                <p className="m-0 text-2xl font-semibold">{Number(value).toLocaleString()}</p>
+                <p className="m-0 text-xs text-success">{analytics.data.summary.change_percent.toFixed(1)}%</p>
               </Card>
             ))}
           </div>
           <Card className="h-[340px]">
-            {!analytics.data.chart.length ? (
+            {!analytics.data.series.length ? (
               <EmptyState title="Нет данных" description="Появятся после первых переходов." />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={analytics.data.chart}>
-                  <XAxis dataKey="label" stroke="currentColor" tick={{ fill: "currentColor", fontSize: 12 }} />
+                <LineChart data={analytics.data.series}>
+                  <XAxis dataKey="bucket_start" stroke="currentColor" tick={{ fill: "currentColor", fontSize: 12 }} />
                   <YAxis stroke="currentColor" tick={{ fill: "currentColor", fontSize: 12 }} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="visits" stroke="rgb(var(--accent))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="count" stroke="rgb(var(--accent))" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             )}

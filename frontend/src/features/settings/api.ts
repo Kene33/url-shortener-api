@@ -7,13 +7,6 @@ export function useChangePasswordMutation() {
   });
 }
 
-export function useToggleTwoFactorMutation() {
-  return useMutation({
-    mutationFn: (payload: { enabled: boolean; code?: string }) =>
-      api.toggleTwoFactor(payload.enabled, payload.code),
-  });
-}
-
 export function useExportDataMutation() {
   return useMutation({
     mutationFn: api.exportData,

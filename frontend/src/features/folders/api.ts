@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
+import type { FolderColor } from "@/api/types";
 
 export const foldersKeys = {
   all: ["folders"] as const,
@@ -20,15 +21,15 @@ export function useCreateFolderMutation() {
   });
 }
 
-export function useRenameFolderMutation(id: string) {
+export function useRenameFolderMutation(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name: string; color: string }) => api.renameFolder(id, payload),
+    mutationFn: (payload: { name: string; color: FolderColor }) => api.updateFolder(id, payload),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: foldersKeys.all }),
   });
 }
 
-export function useDeleteFolderMutation(id: string) {
+export function useDeleteFolderMutation(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => api.deleteFolder(id),

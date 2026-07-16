@@ -26,7 +26,7 @@ export function LinksPage() {
   const [search, setSearch] = useState("");
   const [active, setActive] = useState("all");
   const [folderId, setFolderId] = useState("");
-  const [sort, setSort] = useState<"created_at_desc" | "created_at_asc" | "clicks_desc" | "clicks_asc" | "label_asc">("created_at_desc");
+  const [sort, setSort] = useState<"created_at_desc" | "created_at_asc" | "access_count_desc" | "access_count_asc">("created_at_desc");
   const [page, setPage] = useState(1);
   const links = useLinksQuery({
     q: search || undefined,
@@ -67,7 +67,10 @@ export function LinksPage() {
                 <form
                   className="mt-5 space-y-4"
                   onSubmit={form.handleSubmit(async (values) => {
-                    await createLink.mutateAsync(values);
+                    await createLink.mutateAsync({
+                      ...values,
+                      folder_id: values.folder_id ? Number(values.folder_id) : undefined,
+                    });
                   })}
                 >
                   <Input placeholder="https://example.com" {...form.register("url")} />
@@ -93,7 +96,7 @@ export function LinksPage() {
                     {...form.register("folder_id")}
                   >
                     <option value="">Без папки</option>
-                    {folders.data?.items.map((folder) => (
+                    {folders.data?.map((folder) => (
                       <option key={folder.id} value={folder.id}>
                         {folder.name}
                       </option>
@@ -116,7 +119,7 @@ export function LinksPage() {
           </select>
           <select className="h-10 rounded-panel border border-border bg-panel px-3" value={folderId} onChange={(event) => setFolderId(event.target.value)}>
             <option value="">Все папки</option>
-            {folders.data?.items.map((folder) => (
+            {folders.data?.map((folder) => (
               <option key={folder.id} value={folder.id}>
                 {folder.name}
               </option>
@@ -125,8 +128,8 @@ export function LinksPage() {
           <select className="h-10 rounded-panel border border-border bg-panel px-3" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
             <option value="created_at_desc">Сначала новые</option>
             <option value="created_at_asc">Сначала старые</option>
-            <option value="clicks_desc">По кликам</option>
-            <option value="label_asc">По label</option>
+            <option value="access_count_desc">По кликам</option>
+            <option value="access_count_asc">По кликам: сначала меньше</option>
           </select>
         </div>
       </Card>
@@ -164,7 +167,7 @@ function LinkRow({ item }: { item: {
   access_count: number;
   created_at: string;
   is_active: boolean;
-  folder_name?: string | null;
+  folder_id: number | null;
 } }) {
   const mutation = useUpdateLinkMutation(item.shortcode);
   const [label, setLabel] = useState(item.label ?? "");
@@ -181,7 +184,7 @@ function LinkRow({ item }: { item: {
       <div className="text-sm text-subtle">{item.access_count} переходов</div>
       <div className="text-sm text-subtle">{formatDate(item.created_at)}</div>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-subtle">{item.folder_name ?? "Без папки"}</span>
+        <span className="text-xs text-subtle">{item.folder_id ? `Папка #${item.folder_id}` : "Без папки"}</span>
         <Switch.Root
           checked={item.is_active}
           onCheckedChange={(checked) => mutation.mutate({ is_active: checked })}

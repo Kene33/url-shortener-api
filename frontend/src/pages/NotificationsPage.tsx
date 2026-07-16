@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusMessage } from "@/components/ui/status-message";
 import { useNotificationsQuery, useReadAllNotificationsMutation, useReadNotificationMutation } from "@/features/notifications/api";
 import { formatDate } from "@/lib/utils";
+import type { NotificationItem } from "@/api/types";
 
 export function NotificationsPage() {
   const notifications = useNotificationsQuery();
@@ -34,20 +35,20 @@ export function NotificationsPage() {
   );
 }
 
-function NotificationRow({ item }: { item: { id: string; title: string; body: string; created_at: string; is_read: boolean } }) {
+function NotificationRow({ item }: { item: NotificationItem }) {
   const readMutation = useReadNotificationMutation(item.id);
 
   return (
     <Card className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <p className="m-0 font-semibold">{item.title}</p>
-          {!item.is_read ? <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">new</span> : null}
+          <p className="m-0 font-semibold">{item.key}</p>
+          {!item.read_at ? <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">new</span> : null}
         </div>
-        <p className="m-0 text-sm text-subtle">{item.body}</p>
+        <p className="m-0 text-sm text-subtle">{item.type}</p>
         <p className="m-0 text-xs text-subtle">{formatDate(item.created_at)}</p>
       </div>
-      {!item.is_read ? (
+      {!item.read_at ? (
         <Button variant="secondary" onClick={() => void readMutation.mutateAsync()}>
           Отметить как прочитанное
         </Button>

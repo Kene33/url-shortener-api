@@ -23,7 +23,7 @@ interface SessionContextValue {
   accessToken: string | null;
   isBootstrapping: boolean;
   login: (payload: { email: string; password: string }) => Promise<void | TwoFactorChallengeResponse>;
-  verifyTwoFactor: (payload: { challenge_token: string; code: string }) => Promise<void>;
+  verifyTwoFactor: (payload: { login_token: string; code: string }) => Promise<void>;
   logout: () => Promise<ActionMessageResponse>;
   preferences: Preferences | null;
   setSessionFromResponse: (response: SessionResponse) => void;
@@ -33,10 +33,12 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 
 function normalizePreferences(source?: Partial<Preferences> | null): Preferences {
   return {
-    theme: source?.theme ?? "system",
+    theme: source?.theme ?? "light",
     language: source?.language ?? "ru",
     email_notifications: source?.email_notifications ?? true,
     system_notifications: source?.system_notifications ?? true,
+    created_at: source?.created_at ?? "",
+    updated_at: source?.updated_at ?? "",
   };
 }
 
@@ -89,7 +91,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const profileQuery = useQuery({
     queryKey: ["session", "profile", user?.id],
-    queryFn: api.me,
+    queryFn: api.getProfile,
     enabled: !!accessToken,
     retry: false,
   });
@@ -133,7 +135,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       setSessionFromResponse,
       login: async (payload) => {
         const response = await loginMutation.mutateAsync(payload);
-        if ("two_factor_required" in response && response.two_factor_required) {
+        if ("requires_two_factor" in response && response.requires_two_factor) {
           return response;
         }
         if (isSessionResponse(response)) {

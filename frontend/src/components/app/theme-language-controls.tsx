@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/api/client";
 import { useSession } from "@/features/session/session-provider";
 import { useTheme } from "@/features/theme/theme-provider";
-import type { Language, ThemePreference } from "@/api/types";
+import type { Language, StoredTheme, ThemePreference } from "@/api/types";
 
 export function ThemeLanguageControls() {
   const { i18n } = useTranslation();
@@ -12,7 +12,11 @@ export function ThemeLanguageControls() {
 
   const sync = (next: { theme?: ThemePreference; language?: Language }) => {
     if (user) {
-      void api.updatePreferences(next).catch(() => undefined);
+      const stored: { theme?: StoredTheme; language?: Language } = {
+        ...next,
+        theme: next.theme === "system" ? resolvedTheme : next.theme,
+      };
+      void api.updatePreferences(stored).catch(() => undefined);
     }
   };
 

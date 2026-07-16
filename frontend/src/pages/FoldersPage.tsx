@@ -9,19 +9,26 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { StatusMessage } from "@/components/ui/status-message";
 import { useCreateFolderMutation, useDeleteFolderMutation, useFoldersQuery, useRenameFolderMutation } from "@/features/folders/api";
+import type { Folder, FolderColor } from "@/api/types";
+
+const folderColors: FolderColor[] = ["blue", "cyan", "violet", "orange", "red", "green", "gray"];
+const colorClass: Record<FolderColor, string> = {
+  blue: "bg-sky-500", cyan: "bg-cyan-500", violet: "bg-violet-500", orange: "bg-orange-500",
+  red: "bg-red-500", green: "bg-emerald-500", gray: "bg-slate-500",
+};
 
 const schema = z.object({
   name: z.string().min(1),
-  color: z.string().min(4),
+  color: z.enum(["blue", "cyan", "violet", "orange", "red", "green", "gray"]),
 });
 
 export function FoldersPage() {
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const folders = useFoldersQuery();
   const createFolder = useCreateFolderMutation();
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: { color: "#7052ff" },
+    defaultValues: { color: "violet" },
   });
 
   return (
@@ -35,21 +42,23 @@ export function FoldersPage() {
           className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_140px]"
           onSubmit={form.handleSubmit(async (values) => {
             await createFolder.mutateAsync(values);
-            form.reset({ name: "", color: "#7052ff" });
+            form.reset({ name: "", color: "violet" });
           })}
         >
           <Input placeholder="Новая папка" {...form.register("name")} />
-          <Input type="color" className="px-1" {...form.register("color")} />
+          <select className="h-10 rounded-panel border border-border bg-panel px-3" {...form.register("color")}>
+            {folderColors.map((color) => <option key={color} value={color}>{color}</option>)}
+          </select>
           <Button type="submit">Создать</Button>
         </form>
       </Card>
       {folders.isLoading ? <StatusMessage type="loading" message="Загружаем папки…" /> : null}
       {folders.error ? <StatusMessage type="error" message={folders.error.message} /> : null}
-      {!folders.isLoading && !folders.data?.items.length ? (
+      {!folders.isLoading && !folders.data?.length ? (
         <EmptyState title="Папок пока нет" description="Создайте первую папку для организации ссылок." />
       ) : null}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {folders.data?.items.map((folder) => (
+        {folders.data?.map((folder) => (
           <FolderCard key={folder.id} folder={folder} editingId={editingId} onEdit={setEditingId} />
         ))}
       </div>
@@ -62,14 +71,14 @@ function FolderCard({
   editingId,
   onEdit,
 }: {
-  folder: { id: string; name: string; color: string; links_count: number };
-  editingId: string | null;
-  onEdit: (id: string | null) => void;
+  folder: Folder;
+  editingId: number | null;
+  onEdit: (id: number | null) => void;
 }) {
   const renameFolder = useRenameFolderMutation(folder.id);
   const deleteFolder = useDeleteFolderMutation(folder.id);
-  const form = useForm<{ name: string; color: string }>({
-    resolver: zodResolver(z.object({ name: z.string().min(1), color: z.string().min(4) })),
+  const form = useForm<{ name: string; color: FolderColor }>({
+    resolver: zodResolver(z.object({ name: z.string().min(1), color: z.enum(["blue", "cyan", "violet", "orange", "red", "green", "gray"]) })),
     defaultValues: { name: folder.name, color: folder.color },
   });
   const editing = editingId === folder.id;
@@ -78,10 +87,10 @@ function FolderCard({
     <Card className="space-y-4">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <span className="h-10 w-10 rounded-panel" style={{ backgroundColor: folder.color }} />
+          <span className={`h-10 w-10 rounded-panel ${colorClass[folder.color]}`} />
           <div>
             <p className="m-0 font-semibold">{folder.name}</p>
-            <p className="m-0 text-sm text-subtle">{folder.links_count} ссылок</p>
+            <p className="m-0 text-sm text-subtle">{folder.link_count} ссылок</p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={() => onEdit(editing ? null : folder.id)}>
@@ -97,7 +106,9 @@ function FolderCard({
           })}
         >
           <Input {...form.register("name")} />
-          <Input type="color" className="px-1" {...form.register("color")} />
+          <select className="h-10 rounded-panel border border-border bg-panel px-3" {...form.register("color")}>
+            {folderColors.map((color) => <option key={color} value={color}>{color}</option>)}
+          </select>
           <div className="flex gap-2">
             <Button type="submit">Сохранить</Button>
             <AlertDialog.Root>

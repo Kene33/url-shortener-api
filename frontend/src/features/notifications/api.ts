@@ -12,7 +12,7 @@ export function useNotificationsQuery() {
   });
 }
 
-export function useReadNotificationMutation(id: string) {
+export function useReadNotificationMutation(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => api.readNotification(id),
