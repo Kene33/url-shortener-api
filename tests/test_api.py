@@ -182,6 +182,19 @@ async def test_resolve_unknown_shortcode_returns_404(app_factory):
 
 
 @pytest.mark.asyncio
+async def test_browser_gets_html_not_found_page_for_unknown_shortcode(app_factory):
+    async with app_factory() as harness:
+        response = await harness.client.get(
+            "/does-not-exist",
+            headers={"Accept": "text/html"},
+        )
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Ссылка не найдена" in response.text
+
+
+@pytest.mark.asyncio
 async def test_stale_redis_value_is_corrected_from_sqlite(app_factory, memory_cache):
     async with app_factory(cache=memory_cache) as harness:
         created = await harness.client.post(

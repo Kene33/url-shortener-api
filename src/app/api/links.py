@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Body, Depends, Request, Response, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.api.dependencies import get_link_service, get_optional_user, get_settings
 from app.core.config import Settings
@@ -22,6 +22,35 @@ router = APIRouter(tags=["links"])
 
 def link_short_url(shortcode: str, settings: Settings) -> str:
     return f"{str(settings.public_base_url).rstrip('/')}/{shortcode}"
+
+
+def browser_link_error(
+    request: Request,
+    *,
+    status_code: int,
+    title: str,
+    detail: str,
+) -> HTMLResponse | None:
+    if "text/html" not in request.headers.get("accept", ""):
+        return None
+    return HTMLResponse(
+        status_code=status_code,
+        content=(
+            f'<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f"<title>{title} | LinkCutter</title><style>"
+            "body{margin:0;background:#f5f7fd;color:#151d2c;font:16px Inter,system-ui,sans-serif}"
+            "main{max-width:560px;margin:15vh auto;padding:40px;border:1px solid #e3e8f4;"
+            "border-radius:8px;background:#fff}small{color:#6248ff;font-weight:700}"
+            "h1{margin:14px 0 10px;font-size:28px}p{color:#6c768e;line-height:1.6}"
+            "a{display:inline-block;margin-top:12px;padding:11px 16px;border-radius:8px;"
+            "background:#6248ff;color:#fff;text-decoration:none;font-weight:600}"
+            "@media(prefers-color-scheme:dark){body{background:#0a0e18;color:#edf1ff}"
+            "main{background:#121826;border-color:#283248}p{color:#929eba}}</style></head>"
+            f"<body><main><small>{status_code}</small><h1>{title}</h1><p>{detail}</p>"
+            '<a href="/">На главную</a></main></body></html>'
+        ),
+    )
 
 
 @router.post(
@@ -93,16 +122,33 @@ async def create_link(
 )
 async def resolve_link(
     shortcode: str,
+    request: Request,
     service: Annotated[LinkService, Depends(get_link_service)],
-) -> RedirectResponse:
+) -> Response:
     link = await service.resolve(shortcode)
     if link is None:
+        error_page = browser_link_error(
+            request,
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Ссылка не найдена",
+            detail="Проверьте короткий код: такой ссылки не существует.",
+        )
+        if error_page:
+            return error_page
         raise APIError(
             status_code=status.HTTP_404_NOT_FOUND,
             code="link_not_found",
             detail="Short link not found",
         )
     if not link.is_active:
+        error_page = browser_link_error(
+            request,
+            status_code=status.HTTP_410_GONE,
+            title="Ссылка отключена",
+            detail="Владелец или администратор временно отключил эту ссылку.",
+        )
+        if error_page:
+            return error_page
         raise APIError(
             status_code=status.HTTP_410_GONE,
             code="link_disabled",
@@ -111,6 +157,14 @@ async def resolve_link(
     if link.expires_at is not None and datetime.strptime(
         link.expires_at, "%Y-%m-%d %H:%M:%S"
     ).replace(tzinfo=UTC) <= datetime.now(UTC):
+        error_page = browser_link_error(
+            request,
+            status_code=status.HTTP_410_GONE,
+            title="Срок работы ссылки истёк",
+            detail="Эта ссылка больше недоступна.",
+        )
+        if error_page:
+            return error_page
         raise APIError(
             status_code=status.HTTP_410_GONE,
             code="link_expired",
