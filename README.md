@@ -1,90 +1,114 @@
 # URL Shortener API
 
-API для создания коротких ссылок. Сейчас реализован первый этап: надёжный
-гостевой сценарий без регистрации. Пользователь отправляет длинный URL,
-получает короткий адрес и может сразу им поделиться.
+API для коротких ссылок с гостевым режимом, аккаунтами, личной статистикой и
+защищённой административной модерацией.
 
-## Что уже работает
+## Возможности
 
-- создание ссылки через JSON API;
-- строгая проверка `http` и `https` URL;
-- запрет credentials, localhost и private/reserved literal IP;
-- общий shortcode для одинаковых гостевых URL;
-- редирект по короткому коду;
-- атомарный счётчик переходов;
-- постоянное хранение в SQLite;
-- Redis как необязательный кэш с fallback на SQLite;
-- liveness и readiness endpoints;
-- локальный запуск и Docker Compose;
-- автоматические тесты, lint и CI.
+- гостевое создание ссылок без регистрации;
+- домены без схемы автоматически получают `https://`;
+- безопасная проверка URL и запрет credentials/localhost/private literal IP;
+- регистрация, подтверждение email, login, refresh/logout и восстановление пароля;
+- Argon2-хэши паролей, JWT access tokens и отзываемые refresh tokens;
+- личные ссылки с режимами `reuse` и `new`;
+- пагинация, фильтры, label, активность и базовая статистика;
+- admin API для пользователей и всех гостевых/личных ссылок;
+- неизменяемые целевой URL, shortcode и владелец ссылки;
+- SQLite как источник истины и Redis как необязательный кэш;
+- healthcheck, Docker Compose, Ruff, pytest и GitHub Actions.
 
-Гостевая статистика не публикуется. Изменение назначения и удаление ссылки
-также недоступны: безопасное управление появится вместе с аккаунтами и
-проверкой владельца.
+Гостевая статистика не публикуется. Администратор может отключить ссылку или
+изменить label, но не может подменить её назначение.
+
+## Swagger
+
+Интерактивная документация: `http://localhost:8000/docs`.
+
+OpenAPI JSON: `http://localhost:8000/openapi.json`.
+
+В Swagger защищённые операции используют кнопку `Authorize`. В неё передаётся
+только значение access token; префикс Bearer интерфейс добавляет автоматически.
 
 ## API
 
-Swagger показывает только уже работающий API первого этапа:
+### Общие операции
 
 | Метод | Путь | Назначение |
 |---|---|---|
-| `POST` | `/api/v1/links` | Создать или повторно получить гостевую ссылку |
-| `GET` | `/{shortcode}` | Выполнить редирект и записать переход |
+| `POST` | `/api/v1/links` | Создать гостевую или личную ссылку |
+| `GET` | `/{shortcode}` | Редирект `307` и запись перехода |
 | `GET` | `/health/live` | Проверить работу процесса |
 | `GET` | `/health/ready` | Проверить SQLite и Redis |
 
-Регистрация, вход, кабинет и `/api/v1/me/*` перечислены ниже как дальнейший
-план и пока намеренно отсутствуют в Swagger.
-
-### Создать короткую ссылку
-
-```http
-POST /api/v1/links
-Content-Type: application/json
-
-{
-  "url": "https://example.com/long/path"
-}
-```
-
-Новая ссылка возвращает `201 Created`:
+Гостевой запрос:
 
 ```json
 {
-  "shortcode": "aB3dE7xQ",
-  "short_url": "http://localhost:8000/aB3dE7xQ",
-  "created": true
+  "url": "google.com"
 }
 ```
 
-Если гость повторно отправляет тот же нормализованный URL, API возвращает
-существующий shortcode с `200 OK` и `created: false`.
+`google.com` нормализуется в `https://google.com/`. Повторный гостевой URL
+возвращает тот же shortcode с `200 OK` и `created: false`.
 
-### Перейти по короткой ссылке
+Авторизованный запрос:
 
-```http
-GET /{shortcode}
+```json
+{
+  "url": "https://example.com/campaign",
+  "mode": "new",
+  "label": "Реклама у блогера A"
+}
 ```
 
-Рабочая ссылка отвечает `307 Temporary Redirect`. Неизвестный shortcode
-возвращает `404 Not Found`; зарезервированная, но отключённая ссылка —
-`410 Gone`.
+`reuse` возвращает активную ссылку владельца для этого URL. `new` создаёт новый
+shortcode с отдельной статистикой.
 
-### Состояние сервиса
+### Авторизация
 
-```http
-GET /health/live
-GET /health/ready
-```
+| Метод | Путь | Назначение |
+|---|---|---|
+| `POST` | `/api/v1/auth/register` | Зарегистрировать пользователя |
+| `POST` | `/api/v1/auth/verify-email` | Подтвердить email |
+| `POST` | `/api/v1/auth/login` | Получить access и refresh tokens |
+| `POST` | `/api/v1/auth/refresh` | Ротировать refresh token |
+| `POST` | `/api/v1/auth/logout` | Отозвать refresh token |
+| `POST` | `/api/v1/auth/password-reset/request` | Запросить сброс пароля |
+| `POST` | `/api/v1/auth/password-reset/confirm` | Установить новый пароль |
+| `GET` | `/api/v1/me` | Получить текущего пользователя |
 
-SQLite обязателен для readiness. Если Redis недоступен, сервис отвечает как
-`degraded`, но продолжает создавать ссылки и выполнять редиректы через SQLite.
+Access token короткоживущий. Refresh token хранится в SQLite только как SHA-256
+хэш, ротируется при использовании и отзывается при logout или смене пароля.
 
-Интерактивная документация доступна по `/docs`, OpenAPI-схема — по
-`/openapi.json`.
+Пока email-провайдер не подключён, development-окружение возвращает одноразовый
+verification/reset token в ответе. В production эти поля скрываются.
 
-Для удобства гостевой API принимает как полный URL, так и домен без схемы:
-`google.com` автоматически обрабатывается как `https://google.com/`.
+### Личный кабинет
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| `GET` | `/api/v1/me/links` | Свои ссылки с пагинацией и фильтрами |
+| `GET` | `/api/v1/me/links/{shortcode}` | Ссылка и базовая статистика |
+| `PATCH` | `/api/v1/me/links/{shortcode}` | Изменить `label` или `is_active` |
+
+Ответ содержит исходный и короткий URL, статус, label, число переходов, дату
+создания, дату обновления и последний переход. Чужая ссылка отвечает `404`.
+Поля URL и shortcode отсутствуют в PATCH-модели.
+
+### Администрация
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| `GET` | `/api/v1/admin/users` | Все пользователи |
+| `GET` | `/api/v1/admin/users/{user_id}` | Конкретный пользователь |
+| `PATCH` | `/api/v1/admin/users/{user_id}` | Статус аккаунта и роль admin |
+| `GET` | `/api/v1/admin/links` | Все гостевые и личные ссылки |
+| `GET` | `/api/v1/admin/links/{shortcode}` | Любая ссылка и статистика |
+| `PATCH` | `/api/v1/admin/links/{shortcode}` | Модерация `label/is_active` |
+
+Роль назначается при регистрации, если email находится в `ADMIN_EMAILS`.
+Публичного параметра `is_admin` в регистрации нет. Активный администратор не
+может отключить или понизить собственный аккаунт.
 
 ## Локальный запуск
 
@@ -98,8 +122,7 @@ cp .env.example .env
 uvicorn main:app --app-dir src --reload
 ```
 
-Без Redis приложение продолжит работать, но readiness покажет состояние
-кэша `down`.
+Без Redis приложение продолжает работать; readiness сообщает `degraded`.
 
 ## Docker Compose
 
@@ -107,13 +130,12 @@ uvicorn main:app --app-dir src --reload
 docker compose up --build
 ```
 
-API будет доступен на `http://localhost:8000` и на первом этапе привязан только
-к `127.0.0.1`. Redis запускается отдельным сервисом, а файл SQLite хранится в
-Docker volume.
+API публикуется только на `127.0.0.1:${APP_PORT:-8000}`. SQLite и Redis
+используют отдельные Docker volumes.
 
 ## Ошибки
 
-Обычные ошибки API содержат стабильный машинный код:
+Обычная ошибка:
 
 ```json
 {
@@ -122,9 +144,43 @@ Docker volume.
 }
 ```
 
-Основные коды: `validation_error`, `link_not_found`, `link_disabled`,
-`storage_unavailable` и `shortcode_unavailable`. Ошибка валидации дополнительно
-содержит массив `errors` с расположением и типом каждого нарушения.
+Ошибка валидации дополнительно содержит `errors`. Основные коды:
+`validation_error`, `link_not_found`, `link_disabled`,
+`authentication_required`, `invalid_access_token`, `invalid_refresh_token`,
+`invalid_credentials`, `email_not_verified`, `admin_required`,
+`storage_unavailable` и `shortcode_unavailable`.
+
+## Конфигурация
+
+| Переменная | Назначение | По умолчанию |
+|---|---|---|
+| `PUBLIC_BASE_URL` | Публичный адрес коротких ссылок | `http://localhost:8000` |
+| `DATABASE_PATH` | SQLite database | `data/links.db` |
+| `REDIS_URL` | Redis | `redis://localhost:6379/0` |
+| `CACHE_TTL_SECONDS` | TTL кэша | `3600` |
+| `AUTH_SECRET_KEY` | Секрет подписи JWT | dev-only |
+| `ACCESS_TOKEN_MINUTES` | Жизнь access token | `15` |
+| `REFRESH_TOKEN_DAYS` | Жизнь refresh token | `30` |
+| `EMAIL_VERIFICATION_HOURS` | Жизнь verification token | `24` |
+| `PASSWORD_RESET_MINUTES` | Жизнь reset token | `30` |
+| `ADMIN_EMAILS` | Email будущих администраторов | `[]` |
+| `CORS_ORIGINS` | Разрешённые frontend origins | localhost:3000 |
+| `LOG_LEVEL` | Уровень логирования | `INFO` |
+
+В production необходимо заменить `AUTH_SECRET_KEY`; приложение откажется
+запускаться со стандартным development-секретом.
+
+## Архитектура
+
+```text
+HTTP API -> AuthService -> SQLite
+         -> LinkService -> SQLite
+                        \-> Redis cache
+```
+
+SQLite хранит пользователей, хэши refresh/action tokens, владение ссылками и
+агрегированную статистику. Redis ускоряет редиректы, но не является источником
+истины.
 
 ## Проверки
 
@@ -133,45 +189,15 @@ ruff check .
 pytest
 ```
 
-Эти же проверки выполняются в GitHub Actions для каждого push и pull request.
-
-## Конфигурация
-
-Основные переменные окружения:
-
-| Переменная | Назначение | Значение по умолчанию |
-|---|---|---|
-| `PUBLIC_BASE_URL` | Публичный адрес коротких ссылок | `http://localhost:8000` |
-| `DATABASE_PATH` | Путь к SQLite | `data/links.db` |
-| `REDIS_URL` | Адрес Redis | `redis://localhost:6379/0` |
-| `CACHE_TTL_SECONDS` | Время жизни записи кэша | `3600` |
-| `CORS_ORIGINS` | Разрешённые frontend origins в JSON | localhost:3000 |
-| `LOG_LEVEL` | Уровень логирования | `INFO` |
-
-## Архитектура
-
-```text
-HTTP API -> LinkService -> SQLite
-                    \-> Redis cache
-```
-
-SQLite является источником истины. Redis ускоряет редиректы, но его отказ не
-должен останавливать сервис. В таблице ссылок уже предусмотрены `owner_id`,
-`label` и `is_active` для следующего этапа.
+Те же проверки выполняются в GitHub Actions.
 
 ## Дальнейший план
 
-1. Добавить аккаунты с email/password, подтверждением почты и восстановлением
-   доступа.
-2. Добавить личный кабинет: собственные ссылки, названия, включение/отключение
-   и базовая статистика.
-3. Разрешить владельцу выбирать между повторным использованием своей ссылки и
-   новым shortcode с отдельной статистикой кампании.
-4. Перед публичным запуском добавить rate limiting, защиту от злоупотреблений и
-   административную модерацию.
-5. При масштабировании перейти на PostgreSQL и управляемые миграции.
-
-Целевой URL пользовательской ссылки после создания изменять нельзя.
+1. Подключить email-провайдера.
+2. Добавить rate limiting и защиту auth endpoints от перебора.
+3. Добавить жалобы, admin audit log и причины блокировки.
+4. Перейти на PostgreSQL и Alembic перед масштабированием.
+5. Добавить метрики, резервные копии и error tracking.
 
 ## Лицензия
 
