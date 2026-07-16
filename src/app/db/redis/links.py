@@ -1,27 +1,45 @@
-import redis.asyncio as redis 
-import os
+from typing import Protocol
+
+import redis.asyncio as redis
+
+
+class LinkCache(Protocol):
+    async def get(self, shortcode: str) -> str | None: ...
+
+    async def set(self, shortcode: str, url: str) -> None: ...
+
+    async def delete(self, shortcode: str) -> None: ...
+
+    async def ping(self) -> None: ...
+
+    async def close(self) -> None: ...
+
 
 class RedisClient:
-    def __init__(self, host = "localhost", port = 6379, db = 0) -> None:
+    def __init__(self, url: str, ttl_seconds: int = 3600) -> None:
+        self.client = redis.from_url(
+            url,
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        self.ttl_seconds = ttl_seconds
 
-        self.pool = redis.ConnectionPool(host=host, port=port, db=db)
-        self.client = redis.Redis(connection_pool=self.pool, decode_responses=True)
+    @staticmethod
+    def _key(shortcode: str) -> str:
+        return f"links:{shortcode}"
 
-    async def add_shortlink(self, key: str, value: str) -> dict:
-        added_link = await self.client.set(key, value)
-        if added_link:
-            return {"ok": True, "key": key, "value": value}
-        return {"ok": False, "key": key, "message": f"Link {key} already exists."}
-    
-    async def get_value_by_key(self, key: str) -> dict:
-        value = await self.client.get(key)
-        value = value.decode('utf-8') if value else None
-        if value:
-            return {"ok": True, "key": key, "value": value}
-        return {"ok": False, "key": key, "message": f"Link {key} not found."}
-    
-    async def delete_link(self, key: str) -> dict:
-        deleted_link = await self.client.delete(key)
-        if deleted_link == 1:
-            return {"ok": True, "key": key, "message": f"Link {key} deleted."}
-        return {"ok": False, "key": key, "message": f"Link {key} not found."}
+    async def get(self, shortcode: str) -> str | None:
+        return await self.client.get(self._key(shortcode))
+
+    async def set(self, shortcode: str, url: str) -> None:
+        await self.client.set(self._key(shortcode), url, ex=self.ttl_seconds)
+
+    async def delete(self, shortcode: str) -> None:
+        await self.client.delete(self._key(shortcode))
+
+    async def ping(self) -> None:
+        await self.client.ping()
+
+    async def close(self) -> None:
+        await self.client.close()

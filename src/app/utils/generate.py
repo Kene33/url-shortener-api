@@ -1,9 +1,7 @@
-import random
+import secrets
 import string
 
-async def generate_code(start: int, end: int) -> str:
-    length = random.randint(start, end)
-    characters = string.ascii_letters + string.digits
-    shortcode = ''.join(random.choice(characters) for i in range(length))
 
-    return shortcode
+def generate_code(length: int = 8) -> str:
+    characters = string.ascii_letters + string.digits
+    return "".join(secrets.choice(characters) for _ in range(length))

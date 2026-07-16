@@ -1,68 +1,94 @@
-import os
-import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.responses import RedirectResponse
 
-from app.utils.generate import generate_code
-from app.db.redis.links import RedisClient
-from app.db.sql.crud import SQLClient
+from app.api.dependencies import get_link_service, get_settings
+from app.core.config import Settings
+from app.core.errors import APIError
+from app.schemas.links import (
+    CreateLinkRequest,
+    CreateLinkResponse,
+    ErrorResponse,
+    ValidationErrorResponse,
+)
+from app.services.links import LinkDisabledError, LinkService
+
+router = APIRouter(tags=["links"])
 
 
+@router.post(
+    "/api/v1/links",
+    response_model=CreateLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="create_short_link",
+    responses={
+        200: {"model": CreateLinkResponse, "description": "Existing guest link"},
+        409: {"model": ErrorResponse, "description": "Link is disabled"},
+        422: {"model": ValidationErrorResponse, "description": "Invalid request"},
+        503: {
+            "model": ErrorResponse,
+            "description": "Storage or shortcode allocation unavailable",
+        },
+    },
+)
+async def create_link(
+    payload: CreateLinkRequest,
+    response: Response,
+    service: LinkService = Depends(get_link_service),
+    settings: Settings = Depends(get_settings),
+) -> CreateLinkResponse:
+    try:
+        result = await service.create_guest_link(payload.url, payload.normalized_url)
+    except LinkDisabledError as exc:
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            code="link_disabled",
+            detail="This destination is reserved by a disabled link",
+        ) from exc
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
+    public_base_url = str(settings.public_base_url).rstrip("/")
+    short_url = f"{public_base_url}/{result.link.shortcode}"
+    return CreateLinkResponse(
+        shortcode=result.link.shortcode,
+        short_url=short_url,
+        created=result.created,
+    )
 
-router = APIRouter()
-redis_client = RedisClient()
-sql_client = SQLClient()
 
-@router.post("/api/links/{original_link}", tags=["POST"])
-async def create_link(original_link: str) -> dict:
-    original_link = original_link.replace('"', '')
-    shortcode = await generate_code(4, 8)
-    key_exist = await redis_client.get_value_by_key(shortcode)
-
-    while key_exist["ok"]:
-        shortcode = await generate_code(4, 8)
-        print(f"Shortcode {shortcode} already exists, generating a new one.")
-        key_exist = await redis_client.get_value_by_key(shortcode)
-
-    if not original_link.startswith("http://") and not original_link.startswith("https://"): original_link = "https://" + original_link
-
-    await redis_client.add_shortlink(shortcode, original_link)
-    await sql_client.add_link(original_link, shortcode)
-    print(f"Adding link {original_link} with shortcode {shortcode} to database.")
-    
-    return {"ok": True, "key": shortcode}
-
-@router.get("/{shortcode}", tags=["GET"])
-async def get_link(shortcode: str):
-    link = await redis_client.get_value_by_key(shortcode)
-    await sql_client.increment_access_count(shortcode)
-
-    if link: return RedirectResponse(url=link["value"], status_code=301)
-    return {"error": 404}
-
-@router.delete("/api/links/{shortcode}", tags=["DELETE"])
-async def delete_link(shortcode: str):
-    redis_link = await redis_client.delete_link(shortcode)
-    sql_link = await sql_client.delete_link(shortcode)
-    if redis_link["ok"] and sql_link["ok"]:
-        return {"ok": True, "key": shortcode, "message": f"Link {shortcode} deleted."}
-
-    return {"ok": False, "key": shortcode, "message": f"Link {shortcode} not found."}
-
-@router.get("/api/links/{shortcode}/stats", tags=["GET"])
-async def get_link_stats(shortcode: str):
-    link_stats = await sql_client.get_link_stats(shortcode)
-    if link_stats["ok"]:
-        return {
-            "ok": True,
-            "id": link_stats["id"],
-            "url": link_stats["url"],
-            "shortcode": link_stats["shortcode"],
-            "createdAt": link_stats["createdAt"],
-            "updatedAt": link_stats["updatedAt"],
-            "accessCount": link_stats["accessCount"]
-        }
-    return {"ok": False, "error": link_stats["error"]}
+@router.get(
+    "/{shortcode}",
+    response_class=RedirectResponse,
+    operation_id="resolve_short_link",
+    responses={
+        307: {
+            "description": "Redirect to the immutable destination URL",
+            "headers": {
+                "Location": {
+                    "description": "Destination URL",
+                    "schema": {"type": "string", "format": "uri"},
+                }
+            },
+        },
+        404: {"model": ErrorResponse, "description": "Link not found"},
+        410: {"model": ErrorResponse, "description": "Link disabled"},
+        422: {"model": ValidationErrorResponse, "description": "Invalid path"},
+        503: {"model": ErrorResponse, "description": "Storage unavailable"},
+    },
+)
+async def resolve_link(
+    shortcode: str,
+    service: LinkService = Depends(get_link_service),
+) -> RedirectResponse:
+    link = await service.resolve(shortcode)
+    if link is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="link_not_found",
+            detail="Short link not found",
+        )
+    if not link.is_active:
+        raise APIError(
+            status_code=status.HTTP_410_GONE,
+            code="link_disabled",
+            detail="Short link is disabled",
+        )
+    return RedirectResponse(url=link.url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)

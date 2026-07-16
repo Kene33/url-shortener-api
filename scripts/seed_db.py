@@ -1,6 +1,6 @@
-import sys
-import os
 import asyncio
+import os
+import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
 
@@ -32,8 +32,9 @@ async def seed():
     sql_client = SQLClient("src/app/db/sql/links_test.db")
     await sql_client.create_database()
     for url, shortcode in TEST_LINKS:
-        #shortcode = await generate_code(4, 8)
-        await sql_client.add_link(url, shortcode)
+        existing = await sql_client.get_guest_link_by_url(url)
+        if existing is None:
+            await sql_client.insert_guest_link(url, url, shortcode)
     print("Test data inserted.")
 
 if __name__ == "__main__":
