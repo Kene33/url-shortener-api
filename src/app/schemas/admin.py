@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.auth import UserResponse
 from app.schemas.links import LinkResponse
@@ -16,6 +16,13 @@ class AdminUserUpdateRequest(BaseModel):
 
     is_active: bool | None = None
     is_admin: bool | None = None
+
+
+class AdminLinkUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = Field(default=None, max_length=120)
+    is_active: bool | None = None
 
 
 class AdminLinkResponse(LinkResponse):

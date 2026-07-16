@@ -28,6 +28,7 @@ TEST_LINKS = [
     ("https://forbes.com", "forb40"),
 ]
 
+
 async def seed():
     sql_client = SQLClient("src/app/db/sql/links_test.db")
     await sql_client.create_database()
@@ -36,6 +37,7 @@ async def seed():
         if existing is None:
             await sql_client.insert_guest_link(url, url, shortcode)
     print("Test data inserted.")
+
 
 if __name__ == "__main__":
     asyncio.run(seed())

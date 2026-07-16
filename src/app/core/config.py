@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     refresh_cookie_secure: bool = False
     refresh_cookie_samesite: str = "lax"
     refresh_cookie_domain: str | None = None
-    refresh_cookie_path: str = "/api/v1/auth"
+    refresh_cookie_path: str = "/api/v1"
     user_link_retention_days_default: int = Field(default=365, ge=1, le=3650)
     email_2fa_code_minutes: int = Field(default=10, ge=1, le=60)
     email_provider_configured: bool = False
@@ -50,6 +50,10 @@ class Settings(BaseSettings):
         refresh_cookie_samesite = self.refresh_cookie_samesite.lower()
         if refresh_cookie_samesite not in {"lax", "strict", "none"}:
             raise ValueError("REFRESH_COOKIE_SAMESITE must be lax, strict or none")
+        if refresh_cookie_samesite == "none" and not self.refresh_cookie_secure:
+            raise ValueError("REFRESH_COOKIE_SECURE must be true when SameSite=None")
+        if self.environment.lower() == "production" and not self.refresh_cookie_secure:
+            raise ValueError("REFRESH_COOKIE_SECURE must be true in production")
         self.refresh_cookie_samesite = refresh_cookie_samesite
         self.admin_emails = [email.strip().lower() for email in self.admin_emails]
         return self

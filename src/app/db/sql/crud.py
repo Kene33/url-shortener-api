@@ -133,8 +133,14 @@ class ShortcodeCollisionError(Exception):
 
 
 class SQLClient:
-    def __init__(self, database_path: str = "data/links.db") -> None:
+    def __init__(
+        self,
+        database_path: str = "data/links.db",
+        *,
+        user_link_retention_days_default: int = 365,
+    ) -> None:
         self.database_path = database_path
+        self.user_link_retention_days_default = user_link_retention_days_default
 
     async def create_database(self) -> None:
         path = Path(self.database_path)
@@ -1595,8 +1601,9 @@ class SQLClient:
         await db.execute(
             """
             INSERT OR IGNORE INTO admin_settings (id, user_link_retention_days)
-            VALUES (1, 365)
-            """
+            VALUES (1, ?)
+            """,
+            (self.user_link_retention_days_default,),
         )
         await db.commit()
 

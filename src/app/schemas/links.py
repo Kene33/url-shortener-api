@@ -84,6 +84,7 @@ class ErrorResponse(BaseModel):
         "current_password_invalid",
         "email_already_in_use",
         "account_deleted",
+        "invalid_timezone",
     ]
     detail: str
 

@@ -1,9 +1,11 @@
 import secrets
+import sqlite3
 from pathlib import Path
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 
 from app.api.auth import user_response
 from app.api.dependencies import (
@@ -43,6 +45,7 @@ from app.schemas.me import (
     NotificationResponse,
     PreferencesResponse,
     PreferencesUpdateRequest,
+    ProfileUpdateResponse,
     ProfileUpdateRequest,
     TwoFactorStatusResponse,
 )
@@ -125,20 +128,26 @@ def avatar_dir(settings: Settings) -> Path:
     return path
 
 
-def detect_image_extension(content: bytes, content_type: str | None) -> str | None:
+def detect_image_extension(content: bytes) -> str | None:
     if content.startswith(b"\x89PNG\r\n\x1a\n"):
         return "png"
     if content.startswith(b"\xff\xd8\xff"):
         return "jpg"
     if content.startswith(b"RIFF") and content[8:12] == b"WEBP":
         return "webp"
-    if content_type == "image/png":
-        return "png"
-    if content_type == "image/jpeg":
-        return "jpg"
-    if content_type == "image/webp":
-        return "webp"
     return None
+
+
+def validate_timezone(timezone: str) -> str:
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise APIError(
+            status_code=400,
+            code="invalid_timezone",
+            detail="timezone must be a valid IANA timezone",
+        ) from exc
+    return timezone
 
 
 @router.get("/links", response_model=LinkListResponse, responses=PRIVATE_RESPONSES)
@@ -208,7 +217,7 @@ async def update_my_link(
             folder_id=payload.folder_id if "folder_id" in fields else None,
             set_folder="folder_id" in fields,
         )
-    except Exception as exc:
+    except sqlite3.IntegrityError as exc:
         raise APIError(status_code=404, code="folder_not_found", detail="Folder not found") from exc
     if link is None:
         raise APIError(status_code=404, code="link_not_found", detail="Short link not found")
@@ -292,6 +301,7 @@ async def get_my_analytics(
     period: Literal["24h", "7d", "30d", "90d"] = "7d",
     timezone: str = "UTC",
 ) -> AnalyticsResponse:
+    timezone = validate_timezone(timezone)
     summary, series, top_links = await database.get_owner_analytics(
         user.id, period=period, timezone=timezone
     )
@@ -316,6 +326,7 @@ async def get_my_link_analytics(
     period: Literal["24h", "7d", "30d", "90d"] = "7d",
     timezone: str = "UTC",
 ) -> AnalyticsResponse:
+    timezone = validate_timezone(timezone)
     result = await database.get_link_analytics(shortcode, user.id, period=period, timezone=timezone)
     if result is None:
         raise APIError(status_code=404, code="link_not_found", detail="Short link not found")
@@ -330,14 +341,14 @@ async def get_my_link_analytics(
     )
 
 
-@router.patch("/profile", response_model=UserResponse, responses=PRIVATE_RESPONSES)
+@router.patch("/profile", response_model=ProfileUpdateResponse, responses=PRIVATE_RESPONSES)
 async def update_profile(
     payload: ProfileUpdateRequest,
     user: Annotated[UserRecord, Depends(get_current_user)],
     database: Annotated[SQLClient, Depends(get_database)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> UserResponse:
+) -> ProfileUpdateResponse:
     if not payload.model_fields_set:
         raise APIError(status_code=400, code="invalid_update", detail="No update fields provided")
     updated = user
@@ -363,14 +374,11 @@ async def update_profile(
             ) from exc
         updated = await database.get_user_by_id(user.id) or updated
         if settings.environment.lower() != "production":
-            return JSONResponse(
-                status_code=200,
-                content={
-                    **user_response(updated, settings).model_dump(mode="json"),
-                    "verification_token": token,
-                },
+            return ProfileUpdateResponse(
+                **user_response(updated, settings).model_dump(),
+                verification_token=token,
             )
-    return user_response(updated, settings)
+    return ProfileUpdateResponse(**user_response(updated, settings).model_dump())
 
 
 @router.post("/avatar", response_model=UserResponse, responses=PRIVATE_RESPONSES)
@@ -383,7 +391,7 @@ async def upload_avatar(
     content = await file.read()
     if len(content) > 2 * 1024 * 1024:
         raise APIError(status_code=400, code="invalid_update", detail="Avatar exceeds 2 MiB")
-    extension = detect_image_extension(content, file.content_type)
+    extension = detect_image_extension(content)
     if extension is None:
         raise APIError(status_code=400, code="invalid_update", detail="Unsupported avatar format")
     filename = f"{secrets.token_hex(16)}.{extension}"
@@ -512,6 +520,8 @@ async def delete_account(
             status_code=400, code="current_password_invalid", detail="Password is invalid"
         )
     admin_settings = await database.get_admin_settings()
+    if user.avatar_path:
+        (avatar_dir(settings) / user.avatar_path).unlink(missing_ok=True)
     deleted = await database.delete_account(user.id, admin_settings.user_link_retention_days)
     assert deleted is not None
     response.delete_cookie(

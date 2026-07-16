@@ -11,11 +11,12 @@ from app.db.sql.crud import LinkRecord, SQLClient, UserRecord
 from app.schemas.admin import (
     AdminLinkListResponse,
     AdminLinkResponse,
+    AdminLinkUpdateRequest,
     AdminUserListResponse,
     AdminUserUpdateRequest,
 )
 from app.schemas.auth import UserResponse
-from app.schemas.links import ErrorResponse, UpdateLinkRequest, ValidationErrorResponse
+from app.schemas.links import ErrorResponse, ValidationErrorResponse
 from app.schemas.me import AdminSettingsResponse, AdminSettingsUpdateRequest
 from app.services.links import LinkService
 
@@ -156,7 +157,7 @@ async def get_link(
 @router.patch("/links/{shortcode}", response_model=AdminLinkResponse, responses=ADMIN_RESPONSES)
 async def update_link(
     shortcode: str,
-    payload: UpdateLinkRequest,
+    payload: AdminLinkUpdateRequest,
     admin: Annotated[UserRecord, Depends(require_admin)],
     service: Annotated[LinkService, Depends(get_link_service)],
     database: Annotated[SQLClient, Depends(get_database)],

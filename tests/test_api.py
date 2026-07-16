@@ -334,10 +334,16 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
         "health",
         "auth",
         "profile links",
+        "folders",
+        "analytics",
+        "account",
+        "notifications",
         "admin",
     }
     create_operation = specification["paths"]["/api/v1/links"]["post"]
     assert create_operation["responses"]["201"]["description"] == "Successful Response"
+    assert create_operation["summary"] == "Создать короткую ссылку"
+    assert "reuse/new" in create_operation["description"]
     admin_operation = specification["paths"]["/api/v1/admin/users"]["get"]
     assert admin_operation["security"] == [{"HTTPBearer": []}]
 

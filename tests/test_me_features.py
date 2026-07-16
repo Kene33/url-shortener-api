@@ -109,6 +109,13 @@ async def test_profile_preferences_folders_notifications_and_export(app_factory)
         assert analytics.status_code == 200
         assert analytics.json()["summary"]["active_links"] >= 1
 
+        invalid_timezone = await harness.client.get(
+            "/api/v1/me/analytics?period=7d&timezone=Not/A_Timezone",
+            headers=bearer(tokens),
+        )
+        assert invalid_timezone.status_code == 400
+        assert invalid_timezone.json()["code"] == "invalid_timezone"
+
         link_analytics = await harness.client.get(
             f"/api/v1/me/links/{link.json()['shortcode']}/analytics?period=24h&timezone=UTC",
             headers=bearer(tokens),

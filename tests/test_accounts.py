@@ -278,6 +278,13 @@ async def test_admin_can_manage_users_and_moderate_all_links_and_settings(app_fa
         assert moderated.json()["owner_email"] == "regular@example.com"
         assert moderated.json()["is_active"] is False
 
+        rejected_folder_update = await harness.client.patch(
+            f"/api/v1/admin/links/{owned.json()['shortcode']}",
+            headers=bearer(admin_tokens),
+            json={"folder_id": 1},
+        )
+        assert rejected_folder_update.status_code == 422
+
         disabled_user = await harness.client.patch(
             f"/api/v1/admin/users/{regular_user['id']}",
             headers=bearer(admin_tokens),

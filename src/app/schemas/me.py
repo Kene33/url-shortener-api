@@ -56,6 +56,10 @@ class ProfileUpdateRequest(BaseModel):
     email: EmailStr | None = None
 
 
+class ProfileUpdateResponse(UserResponse):
+    verification_token: str | None = None
+
+
 class AnalyticsSummary(BaseModel):
     total_clicks: float
     active_links: float
