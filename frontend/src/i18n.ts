@@ -59,6 +59,8 @@ const resources = {
       forgotPassword: "Забыли пароль?",
       twoFactorCode: "Код 2FA",
       confirm: "Подтвердить",
+      hideSidebar: "Скрыть навигацию",
+      showSidebar: "Показать навигацию",
     },
   },
   en: {
@@ -118,6 +120,8 @@ const resources = {
       forgotPassword: "Forgot password?",
       twoFactorCode: "2FA code",
       confirm: "Confirm",
+      hideSidebar: "Hide navigation",
+      showSidebar: "Show navigation",
     },
   },
 } as const;

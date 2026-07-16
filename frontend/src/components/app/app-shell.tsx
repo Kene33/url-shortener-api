@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bell, FolderKanban, Home, LayoutDashboard, LogOut, Menu, Settings, User2, X } from "lucide-react";
+import { Bell, FolderKanban, Home, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, User2, X } from "lucide-react";
 import type { PropsWithChildren } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ const links = [
   { to: "/profile", label: "profile", icon: User2 },
   { to: "/notifications", label: "notifications", icon: Bell },
 ];
+
+const SIDEBAR_STORAGE_KEY = "linkcutter.sidebar-open";
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { logout } = useSession();
@@ -57,6 +59,11 @@ export function AppShell({ children }: PropsWithChildren) {
   const profile = useProfileQuery({ enabled: Boolean(user) });
   const { t } = useTranslation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "false");
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen));
+  }, [sidebarOpen]);
 
   if (!user) {
     return <>{children}</>;
@@ -65,7 +72,7 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <div className="page-shell">
       <div className="mx-auto flex min-h-screen max-w-[1600px] gap-4 p-4 md:p-5">
-        <aside className="panel hidden w-[248px] p-4 lg:block">
+        <aside className={cn("panel hidden w-[248px] shrink-0 p-4 lg:block", !sidebarOpen && "lg:hidden")}>
           <SidebarContent />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col gap-4">
@@ -96,9 +103,20 @@ export function AppShell({ children }: PropsWithChildren) {
               </Dialog.Root>
               <Logo />
             </div>
-            <div className="hidden lg:block">
-              <p className="m-0 text-xs uppercase tracking-[0.2em] text-subtle">LinkCutter</p>
-              <p className="m-0 mt-1 text-sm text-subtle">{t("shellHint")}</p>
+            <div className="hidden items-center gap-3 lg:flex">
+              <button
+                type="button"
+                className="pill !h-9 !w-9 !justify-center !p-0"
+                aria-label={sidebarOpen ? t("hideSidebar") : t("showSidebar")}
+                title={sidebarOpen ? t("hideSidebar") : t("showSidebar")}
+                onClick={() => setSidebarOpen((open) => !open)}
+              >
+                {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+              </button>
+              <div>
+                <p className="m-0 text-xs uppercase tracking-[0.2em] text-subtle">LinkCutter</p>
+                <p className="m-0 mt-1 text-sm text-subtle">{t("shellHint")}</p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <ThemeLanguageControls />
