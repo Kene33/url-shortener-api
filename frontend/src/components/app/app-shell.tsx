@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Bell, FolderKanban, Home, LayoutDashboard, Menu, Settings, User2, X } from "lucide-react";
 import type { PropsWithChildren } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/app/logo";
 import { ThemeLanguageControls } from "@/components/app/theme-language-controls";
@@ -49,8 +49,9 @@ function SidebarContent() {
 
 export function AppShell({ children }: PropsWithChildren) {
   const { user } = useSession();
+  const location = useLocation();
 
-  if (!user) {
+  if (!user || location.pathname === "/") {
     return <>{children}</>;
   }
 

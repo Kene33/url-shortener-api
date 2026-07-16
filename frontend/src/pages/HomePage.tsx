@@ -111,6 +111,9 @@ export function HomePage() {
                   ["/links", "Мои ссылки"],
                   ["/analytics", "Аналитика"],
                   ["/folders", "Папки"],
+                  ["/settings", "Настройки"],
+                  ["/profile", "Профиль"],
+                  ["/notifications", "Уведомления"],
                 ].map(([to, label]) => (
                   <Link key={to} to={to} className="panel-soft px-4 py-3 text-sm text-subtle hover:text-text">
                     {label}

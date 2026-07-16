@@ -91,7 +91,7 @@ describe("protected refresh flow", () => {
 
     render(<App />);
 
-    expect(await screen.findByDisplayValue("Campaign")).toBeInTheDocument();
+    expect(await screen.findByText("Campaign")).toBeInTheDocument();
     expect(refreshCalls).toBe(2);
     expect(linksCalls).toBe(2);
   });
