@@ -81,7 +81,7 @@ describe("protected refresh flow", () => {
         );
       }
       if (url.endsWith("/api/v1/me/folders")) {
-        return new Response(JSON.stringify({ items: [] }), {
+        return new Response(JSON.stringify([]), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
