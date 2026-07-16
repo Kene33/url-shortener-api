@@ -17,6 +17,7 @@ from app.db.redis.links import LinkCache, RedisClient
 from app.db.sql.crud import SQLClient
 from app.services.auth import AuthService
 from app.services.links import LinkCreationError, LinkService
+from app.services.rate_limit import RateLimiter
 
 ROUTE_DOCS = {
     "list_users": (
@@ -193,6 +194,7 @@ def create_app(
     settings: Settings | None = None,
     database: SQLClient | None = None,
     cache: LinkCache | None = None,
+    rate_limiter: RateLimiter | None = None,
 ) -> FastAPI:
     app_settings = settings or get_settings()
     app_database = database or SQLClient(
@@ -203,7 +205,12 @@ def create_app(
         app_settings.redis_url,
         ttl_seconds=app_settings.cache_ttl_seconds,
     )
+    app_rate_limiter = rate_limiter or RateLimiter(
+        app_settings.redis_url,
+        prefix=app_settings.rate_limit_prefix,
+    )
     owns_cache = cache is None
+    owns_rate_limiter = rate_limiter is None
 
     logging.basicConfig(
         level=getattr(logging, app_settings.log_level.upper(), logging.INFO),
@@ -216,6 +223,7 @@ def create_app(
         application.state.settings = app_settings
         application.state.database = app_database
         application.state.cache = app_cache
+        application.state.rate_limiter = app_rate_limiter
         application.state.link_service = LinkService(
             database=app_database,
             cache=app_cache,
@@ -231,6 +239,8 @@ def create_app(
         finally:
             if owns_cache:
                 await app_cache.close()
+            if owns_rate_limiter:
+                await app_rate_limiter.close()
 
     application = FastAPI(
         title=app_settings.app_name,
