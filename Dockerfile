@@ -1,14 +1,39 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1
 
-WORKDIR /app
+FROM python:3.11-slim-bookworm AS builder
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
-COPY src/ ./src
+RUN python -m venv "${VIRTUAL_ENV}"
 
-ENV PYTHONPATH=/app/src
+WORKDIR /build
+COPY requirements.txt ./
+RUN pip install --requirement requirements.txt
+
+
+FROM python:3.11-slim-bookworm AS runtime
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
+
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --create-home --home-dir /home/app app \
+    && install --directory --owner=app --group=app /app/data
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=app:app src/ /app/src/
+
+WORKDIR /app/src
+USER 10001:10001
 
 EXPOSE 8000
 
-CMD ["python", "src/main.py"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()"]
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

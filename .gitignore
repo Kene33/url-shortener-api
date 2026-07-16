@@ -38,6 +38,7 @@ build/
 # Docker & env
 *.env
 .env.*
+!.env.example
 docker-compose.override.yml
 
 # Migrations
@@ -109,3 +110,10 @@ grafana/
 
 ree.md
 *.db
+# Local Codex configuration
+.codex/
+
+# Local project planning
+ROADMAP.local.md
+FRONTEND_ROADMAP.local.md
+uv.lock
