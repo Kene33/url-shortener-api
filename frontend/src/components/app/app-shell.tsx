@@ -108,7 +108,7 @@ export function AppShell({ children }: PropsWithChildren) {
                 {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
               </button>
               <div>
-                <p className="m-0 text-xs uppercase tracking-[0.2em] text-subtle">LinkCutter</p>
+                <p className="m-0 text-base font-extrabold uppercase tracking-[0.14em] text-text">LinkCutter</p>
                 <p className="m-0 mt-1 text-sm text-subtle">{t("shellHint")}</p>
               </div>
             </div>
