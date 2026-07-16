@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ const twoFactorSchema = z.object({
 });
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { login, verifyTwoFactor } = useSession();
   const [challenge, setChallenge] = useState<{ token: string; debugCode?: string | null } | null>(null);
@@ -28,9 +30,9 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="Вход"
-      subtitle="Email, пароль и при необходимости код подтверждения."
-      footer={<AuthFooter question="Нет аккаунта?" action="Зарегистрироваться" to="/register" />}
+      title={t("loginTitle")}
+      subtitle={t("loginSubtitle")}
+      footer={<AuthFooter question={t("noAccount")} action={t("registerAction")} to="/register" />}
     >
       {!challenge ? (
         <form
@@ -50,12 +52,12 @@ export function LoginPage() {
           })}
         >
           <Input placeholder="Email" type="email" {...form.register("email")} />
-          <Input placeholder="Пароль" type="password" {...form.register("password")} />
+          <Input placeholder={t("password")} type="password" {...form.register("password")} />
           <Button type="submit" className="w-full">
-            Войти
+            {t("login")}
           </Button>
           <Link to="/forgot-password" className="block text-sm text-accent">
-            Забыли пароль?
+            {t("forgotPassword")}
           </Link>
           {error ? <StatusMessage type="error" message={error} /> : null}
         </form>
@@ -72,10 +74,10 @@ export function LoginPage() {
             }
           })}
         >
-          <Input placeholder="Код 2FA" {...codeForm.register("code")} />
+          <Input placeholder={t("twoFactorCode")} {...codeForm.register("code")} />
           {challenge.debugCode ? <StatusMessage type="success" message={`Dev code: ${challenge.debugCode}`} /> : null}
           <Button type="submit" className="w-full">
-            Подтвердить
+            {t("confirm")}
           </Button>
           {error ? <StatusMessage type="error" message={error} /> : null}
         </form>

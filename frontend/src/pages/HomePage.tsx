@@ -30,25 +30,23 @@ export function HomePage() {
   const result = mutation.data?.short_url;
 
   return (
-    <div className="page-shell">
+    <div className={user ? "" : "page-shell"}>
       <div className="mx-auto max-w-[1280px] px-4 py-4 md:px-5">
-        <div className="panel mb-4 flex items-center justify-between p-4">
-          <Logo />
-          <div className="flex items-center gap-2">
-            {!user && (
-              <>
-                <Link to="/login" className="pill">
-                  {t("login")}
-                </Link>
-                <Link to="/register" className="rounded-panel bg-accent px-4 py-2 text-sm font-medium text-white">
-                  {t("register")}
-                </Link>
-              </>
-            )}
-            <ThemeLanguageControls />
+        {!user && (
+          <div className="panel mb-4 flex items-center justify-between p-4">
+            <Logo />
+            <div className="flex items-center gap-2">
+              <Link to="/login" className="inline-flex h-9 items-center justify-center rounded-panel border border-border bg-panel px-4 text-sm font-medium text-text transition hover:bg-muted">
+                {t("login")}
+              </Link>
+              <Link to="/register" className="inline-flex h-9 items-center justify-center rounded-panel border border-accent bg-accent px-4 text-sm font-medium text-white transition hover:opacity-95">
+                {t("register")}
+              </Link>
+              <ThemeLanguageControls />
+            </div>
           </div>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        )}
+        <div className="grid gap-4">
           <Card className="space-y-6 p-6 md:p-10">
             <div className="space-y-3 text-center md:text-left">
               <h1 className="m-0 max-w-xl text-3xl font-semibold tracking-tight md:text-4xl">
@@ -105,25 +103,6 @@ export function HomePage() {
               ))}
             </div>
           </Card>
-          {user ? (
-            <Card className="space-y-4">
-              <p className="m-0 text-sm font-semibold">{t("navigation")}</p>
-              <div className="grid gap-2">
-                {[
-                  ["/links", t("yourLinks")],
-                  ["/analytics", t("analytics")],
-                  ["/folders", t("folders")],
-                  ["/settings", t("settings")],
-                  ["/profile", t("profile")],
-                  ["/notifications", t("notifications")],
-                ].map(([to, label]) => (
-                  <Link key={to} to={to} className="panel-soft px-4 py-3 text-sm text-subtle hover:text-text">
-                    {label}
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          ) : null}
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Bell, FolderKanban, Home, LayoutDashboard, LogOut, Menu, Settings, User2, X } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import { useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/app/logo";
@@ -46,7 +46,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
       <Button variant="ghost" className="justify-start" onClick={() => void logout()}>
-        Выйти
+        {t("logout")}
       </Button>
     </div>
   );
@@ -55,11 +55,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: PropsWithChildren) {
   const { user, logout } = useSession();
   const profile = useProfileQuery({ enabled: Boolean(user) });
-  const location = useLocation();
   const { t } = useTranslation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
-  if (!user || location.pathname === "/") {
+  if (!user) {
     return <>{children}</>;
   }
 

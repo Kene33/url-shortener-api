@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -20,15 +21,16 @@ const schema = z
   });
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <AuthLayout
-      title="Регистрация"
-      subtitle="Создайте аккаунт для папок, аналитики и уведомлений."
-      footer={<AuthFooter question="Уже есть аккаунт?" action="Войти" to="/login" />}
+      title={t("register")}
+      subtitle={t("registerSubtitle")}
+      footer={<AuthFooter question={t("hasAccount")} action={t("login")} to="/login" />}
     >
       <form
         className="space-y-4"
@@ -48,10 +50,10 @@ export function RegisterPage() {
         })}
       >
         <Input placeholder="Email" type="email" {...form.register("email")} />
-        <Input placeholder="Пароль" type="password" {...form.register("password")} />
-        <Input placeholder="Повторите пароль" type="password" {...form.register("confirmPassword")} />
+        <Input placeholder={t("password")} type="password" {...form.register("password")} />
+        <Input placeholder={t("confirmPassword")} type="password" {...form.register("confirmPassword")} />
         <Button type="submit" className="w-full">
-          Зарегистрироваться
+          {t("registerAction")}
         </Button>
         {message ? <StatusMessage type="success" message={message} /> : null}
         {error ? <StatusMessage type="error" message={error} /> : null}
