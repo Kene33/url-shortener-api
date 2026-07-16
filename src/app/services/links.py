@@ -61,6 +61,58 @@ class LinkService:
 
         raise LinkCreationError("Unable to allocate a unique shortcode")
 
+    async def create_user_link(
+        self,
+        *,
+        url: str,
+        normalized_url: str,
+        owner_id: int,
+        label: str | None,
+        reuse: bool,
+    ) -> CreateLinkResult:
+        for _ in range(self.max_attempts):
+            shortcode = generate_code(self.shortcode_length)
+            try:
+                link, created = await self.database.get_or_create_user_link(
+                    url=url,
+                    normalized_url=normalized_url,
+                    shortcode=shortcode,
+                    owner_id=owner_id,
+                    label=label,
+                    reuse=reuse,
+                )
+            except ShortcodeCollisionError:
+                continue
+            if created:
+                await self._cache_set(link.shortcode, link.url)
+            return CreateLinkResult(link=link, created=created)
+        raise LinkCreationError("Unable to allocate a unique shortcode")
+
+    async def update_link_metadata(
+        self,
+        shortcode: str,
+        *,
+        owner_id: int | None,
+        label: str | None,
+        set_label: bool,
+        is_active: bool | None,
+        set_active: bool,
+    ) -> LinkRecord | None:
+        link = await self.database.update_link_metadata(
+            shortcode,
+            owner_id=owner_id,
+            label=label,
+            set_label=set_label,
+            is_active=is_active,
+            set_active=set_active,
+        )
+        if link is not None:
+            if link.is_active:
+                await self._cache_set(link.shortcode, link.url)
+            else:
+                await self._cache_delete(link.shortcode)
+        return link
+
     async def resolve(self, shortcode: str) -> LinkRecord | None:
         cached_url = await self._cache_get(shortcode)
         if cached_url is not None:

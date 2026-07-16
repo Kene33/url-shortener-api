@@ -3,9 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Response, status
 from fastapi.responses import RedirectResponse
 
-from app.api.dependencies import get_link_service, get_settings
+from app.api.dependencies import get_link_service, get_optional_user, get_settings
 from app.core.config import Settings
 from app.core.errors import APIError
+from app.db.sql.crud import UserRecord
 from app.schemas.links import (
     CreateLinkRequest,
     CreateLinkResponse,
@@ -20,6 +21,7 @@ router = APIRouter(tags=["links"])
 @router.post(
     "/api/v1/links",
     response_model=CreateLinkResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
     summary="Создать короткую ссылку",
     description=(
@@ -54,6 +56,10 @@ router = APIRouter(tags=["links"])
                     }
                 }
             },
+        },
+        401: {
+            "model": ErrorResponse,
+            "description": "Поля аккаунта переданы без access token",
         },
         422: {
             "model": ValidationErrorResponse,
@@ -105,9 +111,25 @@ async def create_link(
     response: Response,
     service: LinkService = Depends(get_link_service),
     settings: Settings = Depends(get_settings),
+    user: UserRecord | None = Depends(get_optional_user),
 ) -> CreateLinkResponse:
+    if user is None and (payload.mode != "reuse" or payload.label is not None):
+        raise APIError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="authentication_required",
+            detail="mode and label require an authenticated account",
+        )
     try:
-        result = await service.create_guest_link(payload.url, payload.normalized_url)
+        if user is None:
+            result = await service.create_guest_link(payload.url, payload.normalized_url)
+        else:
+            result = await service.create_user_link(
+                url=payload.url,
+                normalized_url=payload.normalized_url,
+                owner_id=user.id,
+                label=payload.label,
+                reuse=payload.mode == "reuse",
+            )
     except LinkDisabledError as exc:
         raise APIError(
             status_code=status.HTTP_409_CONFLICT,
@@ -121,6 +143,8 @@ async def create_link(
         shortcode=result.link.shortcode,
         short_url=short_url,
         created=result.created,
+        owner_id=user.id if user is not None else None,
+        label=result.link.label if user is not None else None,
     )
 
 

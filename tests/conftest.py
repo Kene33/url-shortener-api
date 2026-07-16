@@ -79,6 +79,8 @@ def app_factory(
             redis_url="redis://unused.invalid:6379/0",
             cors_origins=[],
             shortcode_length=8,
+            auth_secret_key="test-secret-key-with-at-least-24-characters",
+            admin_emails=["admin@example.com"],
         )
         app = create_app(settings=settings, database=app_database, cache=app_cache)
 

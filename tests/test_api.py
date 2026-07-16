@@ -113,13 +113,13 @@ async def test_create_guest_link_rejects_extra_json_fields(app_factory):
     async with app_factory() as harness:
         response = await harness.client.post(
             "/api/v1/links",
-            json={"url": "https://example.com", "label": "not supported"},
+            json={"url": "https://example.com", "unknown": "not supported"},
         )
 
     assert_validation_error(response)
     assert response.json()["errors"] == [
         {
-            "loc": ["body", "label"],
+            "loc": ["body", "unknown"],
             "msg": "Extra inputs are not permitted",
             "type": "extra_forbidden",
         }
@@ -293,22 +293,50 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
     redirect_responses = specification["paths"]["/{shortcode}"]["get"]["responses"]
     assert {"307", "404", "410", "422", "503"} <= set(redirect_responses)
     assert "Location" in redirect_responses["307"]["headers"]
-    assert set(specification["paths"]) == {
+    assert {
         "/api/v1/links",
         "/{shortcode}",
         "/health/live",
         "/health/ready",
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/verify-email",
+        "/api/v1/auth/password-reset/request",
+        "/api/v1/auth/password-reset/confirm",
+        "/api/v1/me",
+        "/api/v1/me/links",
+        "/api/v1/me/links/{shortcode}",
+        "/api/v1/admin/users",
+        "/api/v1/admin/users/{user_id}",
+        "/api/v1/admin/links",
+        "/api/v1/admin/links/{shortcode}",
+    } <= set(specification["paths"])
+    assert specification["info"]["description"].startswith("URL Shortener API")
+    assert {tag["name"] for tag in specification["tags"]} == {
+        "links",
+        "health",
+        "auth",
+        "profile links",
+        "admin",
     }
-    assert specification["info"]["description"].startswith("API первого этапа")
-    assert {tag["name"] for tag in specification["tags"]} == {"links", "health"}
     create_operation = specification["paths"]["/api/v1/links"]["post"]
     request_examples = create_operation["requestBody"]["content"]["application/json"][
         "examples"
     ]
     assert request_examples["bare_domain"]["value"] == {"url": "google.com"}
     assert create_operation["summary"] == "Создать короткую ссылку"
+    assert "security" not in create_operation
+    admin_operation = specification["paths"]["/api/v1/admin/users"]["get"]
+    assert admin_operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_settings_reject_invalid_public_base_url():
     with pytest.raises(ValidationError):
         Settings(public_base_url="not-a-url")
+
+
+def test_settings_require_custom_auth_secret_in_production():
+    with pytest.raises(ValidationError):
+        Settings(environment="production")

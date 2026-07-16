@@ -34,6 +34,15 @@ class CreateLinkRequest(BaseModel):
             examples=["google.com", "https://example.com/long/path"],
         ),
     ]
+    mode: Literal["reuse", "new"] = Field(
+        default="reuse",
+        description="Для аккаунта: вернуть существующую ссылку или создать новую кампанию",
+    )
+    label: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Необязательное название пользовательской ссылки",
+    )
 
     @field_validator("url")
     @classmethod
@@ -85,6 +94,8 @@ class CreateLinkResponse(BaseModel):
         bool,
         Field(description="true для новой ссылки; false при повторном гостевом URL"),
     ]
+    owner_id: int | None = None
+    label: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -93,6 +104,18 @@ class ErrorResponse(BaseModel):
         "link_disabled",
         "storage_unavailable",
         "shortcode_unavailable",
+        "email_already_registered",
+        "invalid_credentials",
+        "email_not_verified",
+        "user_inactive",
+        "invalid_access_token",
+        "invalid_refresh_token",
+        "invalid_action_token",
+        "authentication_required",
+        "admin_required",
+        "user_not_found",
+        "cannot_modify_self",
+        "invalid_update",
     ]
     detail: Annotated[str, Field(description="Человекочитаемое описание ошибки")]
 
@@ -138,3 +161,29 @@ class ReadinessResponse(BaseModel):
     status: Literal["ok", "degraded", "unavailable"]
     database: Literal["up", "down"]
     cache: Literal["up", "down", "unknown"]
+
+
+class LinkResponse(BaseModel):
+    shortcode: str
+    url: HttpUrl
+    short_url: HttpUrl
+    label: str | None
+    is_active: bool
+    access_count: int
+    created_at: str
+    updated_at: str
+    last_accessed_at: str | None
+
+
+class LinkListResponse(BaseModel):
+    items: list[LinkResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class UpdateLinkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = Field(default=None, max_length=120)
+    is_active: bool | None = None

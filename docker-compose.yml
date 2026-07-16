@@ -8,6 +8,12 @@ services:
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
       DATABASE_PATH: "${DATABASE_PATH:-/app/data/links.db}"
       REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+      AUTH_SECRET_KEY: "${AUTH_SECRET_KEY:-development-only-change-me}"
+      ACCESS_TOKEN_MINUTES: "${ACCESS_TOKEN_MINUTES:-15}"
+      REFRESH_TOKEN_DAYS: "${REFRESH_TOKEN_DAYS:-30}"
+      EMAIL_VERIFICATION_HOURS: "${EMAIL_VERIFICATION_HOURS:-24}"
+      PASSWORD_RESET_MINUTES: "${PASSWORD_RESET_MINUTES:-30}"
+      ADMIN_EMAILS: '${ADMIN_EMAILS:-[]}'
       CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000"]}'
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"

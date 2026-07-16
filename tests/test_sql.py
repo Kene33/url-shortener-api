@@ -176,3 +176,26 @@ async def test_startup_upgrades_v2_schema_with_canonical_column(tmp_path, app_fa
 
     assert "is_canonical" in {column[1] for column in columns}
     assert migrated is not None and migrated.is_canonical is True
+
+
+@pytest.mark.asyncio
+async def test_startup_creates_account_and_session_tables(tmp_path):
+    database_path = tmp_path / "account-schema.db"
+    database = SQLClient(str(database_path))
+
+    await database.create_database()
+
+    connection = sqlite3.connect(database_path)
+    try:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        user_version = connection.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        connection.close()
+
+    assert {"links", "users", "refresh_tokens", "action_tokens"} <= tables
+    assert user_version == 4

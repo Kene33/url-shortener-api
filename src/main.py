@@ -14,6 +14,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import APIError
 from app.db.redis.links import LinkCache, RedisClient
 from app.db.sql.crud import SQLClient
+from app.services.auth import AuthService
 from app.services.links import LinkCreationError, LinkService
 
 
@@ -47,6 +48,10 @@ def create_app(
             shortcode_length=app_settings.shortcode_length,
             max_attempts=app_settings.shortcode_max_attempts,
         )
+        application.state.auth_service = AuthService(
+            database=app_database,
+            settings=app_settings,
+        )
         try:
             yield
         finally:
@@ -56,9 +61,8 @@ def create_app(
     application = FastAPI(
         title=app_settings.app_name,
         description=(
-            "API первого этапа URL Shortener: гостевое создание коротких ссылок, "
-            "неизменяемый редирект и проверка состояния сервиса. Аккаунты, личный "
-            "кабинет и пользовательская статистика относятся к следующим этапам."
+            "URL Shortener API с гостевым режимом, аккаунтами, личными ссылками, "
+            "базовой статистикой и защищённой административной модерацией."
         ),
         version="1.0.0",
         openapi_tags=[
@@ -73,6 +77,27 @@ def create_app(
                 "name": "health",
                 "description": "Проверки работоспособности API, SQLite и Redis.",
             },
+            {
+                "name": "auth",
+                "description": (
+                    "Регистрация, подтверждение email, вход, refresh/logout и "
+                    "восстановление пароля."
+                ),
+            },
+            {
+                "name": "profile links",
+                "description": (
+                    "Личные ссылки, фильтры, базовая статистика и безопасное "
+                    "изменение label/is_active."
+                ),
+            },
+            {
+                "name": "admin",
+                "description": (
+                    "Управление пользователями и модерация всех ссылок. "
+                    "URL и shortcode не подлежат изменению."
+                ),
+            },
         ],
         license_info={"name": "MIT"},
         lifespan=lifespan,
@@ -84,7 +109,7 @@ def create_app(
             CORSMiddleware,
             allow_origins=app_settings.cors_origins,
             allow_credentials=False,
-            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type"],
         )
 
