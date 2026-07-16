@@ -61,6 +61,9 @@ const resources = {
       confirm: "Подтвердить",
       hideSidebar: "Скрыть навигацию",
       showSidebar: "Показать навигацию",
+      accountPromptTitle: "Сохраняйте ссылки в личном кабинете",
+      accountPromptDescription: "Папки, история созданных ссылок и статистика переходов будут доступны в одном месте.",
+      accountPromptAction: "Создать аккаунт",
     },
   },
   en: {
@@ -122,6 +125,9 @@ const resources = {
       confirm: "Confirm",
       hideSidebar: "Hide navigation",
       showSidebar: "Show navigation",
+      accountPromptTitle: "Keep links in your personal dashboard",
+      accountPromptDescription: "Folders, link history and click statistics stay together in one place.",
+      accountPromptAction: "Create account",
     },
   },
 } as const;

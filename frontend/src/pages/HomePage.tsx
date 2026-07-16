@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChartNoAxesColumn, ShieldCheck, Zap } from "lucide-react";
+import { ChartNoAxesColumn, ShieldCheck, UserRoundPlus, Zap } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ThemeLanguageControls } from "@/components/app/theme-language-controls";
@@ -85,6 +85,22 @@ export function HomePage() {
                 <StatusMessage type="error" message={mutation.error.message} />
               ) : null}
             </form>
+            {!user && (
+              <div className="flex flex-col gap-4 rounded-panel border border-accent/20 bg-accent/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+                    <UserRoundPlus className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="m-0 text-sm font-medium">{t("accountPromptTitle")}</p>
+                    <p className="m-0 mt-1 text-xs leading-5 text-subtle">{t("accountPromptDescription")}</p>
+                  </div>
+                </div>
+                <Link to="/register" className="inline-flex h-9 shrink-0 items-center justify-center rounded-panel border border-border bg-panel px-4 text-sm font-medium text-text transition hover:bg-muted">
+                  {t("accountPromptAction")}
+                </Link>
+              </div>
+            )}
             <div className="grid gap-3 md:grid-cols-3">
               {[
                 { icon: Zap, title: t("instant"), text: t("instantHint") },
