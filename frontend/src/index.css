@@ -1,0 +1,89 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --surface: 245 247 253;
+    --panel: 255 255 255;
+    --muted: 243 245 251;
+    --border: 227 232 244;
+    --text: 21 29 44;
+    --subtle: 108 118 142;
+    --accent: 98 72 255;
+    --success: 34 197 94;
+    --danger: 239 68 68;
+    --warning: 245 158 11;
+    --ring: 98 72 255;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --surface: 10 14 24;
+    --panel: 18 24 38;
+    --muted: 21 28 44;
+    --border: 40 50 72;
+    --text: 237 241 255;
+    --subtle: 146 158 186;
+    --accent: 114 87 255;
+    --success: 74 222 128;
+    --danger: 248 113 113;
+    --warning: 251 191 36;
+    --ring: 114 87 255;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    @apply min-h-screen;
+  }
+
+  html {
+    @apply bg-surface text-text;
+  }
+
+  body {
+    @apply m-0 bg-surface font-sans text-sm text-text antialiased;
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply min-h-screen bg-grid-light transition-colors duration-300 dark:bg-grid-dark;
+  }
+
+  .panel {
+    @apply rounded-panel border border-border bg-panel shadow-panel transition-colors duration-300 dark:shadow-dark;
+  }
+
+  .panel-soft {
+    @apply rounded-panel border border-border bg-muted/80;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs font-medium text-subtle;
+  }
+}
