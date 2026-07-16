@@ -1,58 +1,30 @@
 from ipaddress import ip_address
 from typing import Annotated, Any, Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    HttpUrl,
-    StringConstraints,
-    field_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, field_validator
 
 from app.utils.urls import add_default_scheme, http_url_adapter, normalize_url
 
 MAX_URL_LENGTH = 2048
 SHORTCODE_PATTERN = r"^[A-Za-z0-9]+$"
+FOLDER_COLORS = ("blue", "cyan", "violet", "orange", "red", "green", "gray")
 
 
 class CreateLinkRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        json_schema_extra={"examples": [{"url": "google.com"}]},
-    )
+    model_config = ConfigDict(extra="forbid")
 
-    url: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=MAX_URL_LENGTH,
-            description=(
-                "Целевой HTTP/HTTPS URL. Для домена без схемы автоматически "
-                "используется HTTPS."
-            ),
-            examples=["google.com", "https://example.com/long/path"],
-        ),
-    ]
-    mode: Literal["reuse", "new"] = Field(
-        default="reuse",
-        description="Для аккаунта: вернуть существующую ссылку или создать новую кампанию",
-    )
-    label: str | None = Field(
-        default=None,
-        max_length=120,
-        description="Необязательное название пользовательской ссылки",
-    )
+    url: Annotated[str, Field(min_length=1, max_length=MAX_URL_LENGTH)]
+    mode: Literal["reuse", "new"] = "reuse"
+    label: str | None = Field(default=None, max_length=120)
+    folder_id: int | None = Field(default=None, ge=1)
 
     @field_validator("url")
     @classmethod
     def validate_url(cls, value: str) -> str:
         candidate = add_default_scheme(value)
         parsed = http_url_adapter.validate_python(candidate)
-
         if parsed.username is not None or parsed.password is not None:
             raise ValueError("URL credentials are not allowed")
-
         hostname = (parsed.host or "").strip("[]").rstrip(".").lower()
         if hostname == "localhost" or hostname.endswith(".localhost"):
             raise ValueError("Local destinations are not allowed")
@@ -63,7 +35,6 @@ class CreateLinkRequest(BaseModel):
         else:
             if not address.is_global or address.is_multicast or address.is_site_local:
                 raise ValueError("Private and reserved IP destinations are not allowed")
-
         if len(str(parsed)) > MAX_URL_LENGTH:
             raise ValueError(f"URL must not exceed {MAX_URL_LENGTH} characters")
         return str(parsed)
@@ -74,34 +45,22 @@ class CreateLinkRequest(BaseModel):
 
 
 class CreateLinkResponse(BaseModel):
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "shortcode": "aB3dE7xQ",
-                "short_url": "http://localhost:8000/aB3dE7xQ",
-                "created": True,
-            }
-        }
-    )
-
     shortcode: Annotated[
         str,
         StringConstraints(min_length=6, max_length=32, pattern=SHORTCODE_PATTERN),
-        Field(description="Зарезервированный код короткой ссылки"),
     ]
-    short_url: Annotated[HttpUrl, Field(description="Готовая короткая ссылка")]
-    created: Annotated[
-        bool,
-        Field(description="true для новой ссылки; false при повторном гостевом URL"),
-    ]
+    short_url: HttpUrl
+    created: bool
     owner_id: int | None = None
     label: str | None = None
+    folder_id: int | None = None
 
 
 class ErrorResponse(BaseModel):
     code: Literal[
         "link_not_found",
         "link_disabled",
+        "link_expired",
         "storage_unavailable",
         "shortcode_unavailable",
         "email_already_registered",
@@ -116,8 +75,17 @@ class ErrorResponse(BaseModel):
         "user_not_found",
         "cannot_modify_self",
         "invalid_update",
+        "folder_not_found",
+        "folder_access_denied",
+        "email_delivery_unavailable",
+        "two_factor_required",
+        "invalid_two_factor_code",
+        "notification_not_found",
+        "current_password_invalid",
+        "email_already_in_use",
+        "account_deleted",
     ]
-    detail: Annotated[str, Field(description="Человекочитаемое описание ошибки")]
+    detail: str
 
 
 class ValidationErrorResponse(BaseModel):
@@ -143,21 +111,10 @@ class ValidationErrorResponse(BaseModel):
 
 
 class LivenessResponse(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"example": {"status": "ok"}})
-
     status: Literal["ok"]
 
 
 class ReadinessResponse(BaseModel):
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {"status": "ok", "database": "up", "cache": "up"},
-                {"status": "degraded", "database": "up", "cache": "down"},
-            ]
-        }
-    )
-
     status: Literal["ok", "degraded", "unavailable"]
     database: Literal["up", "down"]
     cache: Literal["up", "down", "unknown"]
@@ -169,10 +126,12 @@ class LinkResponse(BaseModel):
     short_url: HttpUrl
     label: str | None
     is_active: bool
+    folder_id: int | None
     access_count: int
     created_at: str
     updated_at: str
     last_accessed_at: str | None
+    expires_at: str | None
 
 
 class LinkListResponse(BaseModel):
@@ -187,3 +146,4 @@ class UpdateLinkRequest(BaseModel):
 
     label: str | None = Field(default=None, max_length=120)
     is_active: bool | None = None
+    folder_id: int | None = Field(default=None, ge=1)

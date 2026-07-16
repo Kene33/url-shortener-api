@@ -16,8 +16,7 @@ router = APIRouter(prefix="/health", tags=["health"])
     response_model=LivenessResponse,
     summary="Проверить работу процесса",
     description=(
-        "Возвращает `200`, если процесс API запущен. Проверка не обращается "
-        "к SQLite или Redis."
+        "Возвращает `200`, если процесс API запущен. Проверка не обращается к SQLite или Redis."
     ),
     response_description="Процесс API работает",
     operation_id="health_liveness",

@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     refresh_token_days: int = Field(default=30, ge=1, le=365)
     email_verification_hours: int = Field(default=24, ge=1, le=168)
     password_reset_minutes: int = Field(default=30, ge=5, le=1440)
+    avatar_dir: str = "data/avatars"
+    refresh_cookie_name: str = "linkcutter_refresh"
+    refresh_cookie_secure: bool = False
+    refresh_cookie_samesite: str = "lax"
+    refresh_cookie_domain: str | None = None
+    refresh_cookie_path: str = "/api/v1/auth"
+    user_link_retention_days_default: int = Field(default=365, ge=1, le=3650)
+    email_2fa_code_minutes: int = Field(default=10, ge=1, le=60)
+    email_provider_configured: bool = False
     admin_emails: list[str] = []
     cors_origins: list[str] = [
         "http://localhost:3000",
@@ -38,6 +47,10 @@ class Settings(BaseSettings):
             and self.auth_secret_key == "development-only-change-me"
         ):
             raise ValueError("AUTH_SECRET_KEY must be changed in production")
+        refresh_cookie_samesite = self.refresh_cookie_samesite.lower()
+        if refresh_cookie_samesite not in {"lax", "strict", "none"}:
+            raise ValueError("REFRESH_COOKIE_SAMESITE must be lax, strict or none")
+        self.refresh_cookie_samesite = refresh_cookie_samesite
         self.admin_emails = [email.strip().lower() for email in self.admin_emails]
         return self
 

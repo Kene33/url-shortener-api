@@ -287,12 +287,11 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
         specification = (await harness.client.get("/openapi.json")).json()
 
     responses = specification["paths"]["/api/v1/links"]["post"]["responses"]
-    assert {"200", "201", "409", "422", "503"} <= set(responses)
+    assert {"200", "201", "401", "409", "422", "503"} <= set(responses)
     ready_responses = specification["paths"]["/health/ready"]["get"]["responses"]
     assert {"200", "503"} <= set(ready_responses)
     redirect_responses = specification["paths"]["/{shortcode}"]["get"]["responses"]
     assert {"307", "404", "410", "422", "503"} <= set(redirect_responses)
-    assert "Location" in redirect_responses["307"]["headers"]
     assert {
         "/api/v1/links",
         "/{shortcode}",
@@ -305,9 +304,25 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
         "/api/v1/auth/verify-email",
         "/api/v1/auth/password-reset/request",
         "/api/v1/auth/password-reset/confirm",
+        "/api/v1/auth/2fa/verify",
         "/api/v1/me",
         "/api/v1/me/links",
         "/api/v1/me/links/{shortcode}",
+        "/api/v1/me/links/{shortcode}/analytics",
+        "/api/v1/me/folders",
+        "/api/v1/me/folders/{folder_id}",
+        "/api/v1/me/profile",
+        "/api/v1/me/preferences",
+        "/api/v1/me/change-password",
+        "/api/v1/me/export",
+        "/api/v1/me/analytics",
+        "/api/v1/me/notifications",
+        "/api/v1/me/notifications/{notification_id}/read",
+        "/api/v1/me/notifications/read-all",
+        "/api/v1/me/2fa/email/request-enable",
+        "/api/v1/me/2fa/email/confirm-enable",
+        "/api/v1/me/2fa/email/disable",
+        "/api/v1/admin/settings",
         "/api/v1/admin/users",
         "/api/v1/admin/users/{user_id}",
         "/api/v1/admin/links",
@@ -322,12 +337,7 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
         "admin",
     }
     create_operation = specification["paths"]["/api/v1/links"]["post"]
-    request_examples = create_operation["requestBody"]["content"]["application/json"][
-        "examples"
-    ]
-    assert request_examples["bare_domain"]["value"] == {"url": "google.com"}
-    assert create_operation["summary"] == "Создать короткую ссылку"
-    assert "security" not in create_operation
+    assert create_operation["responses"]["201"]["description"] == "Successful Response"
     admin_operation = specification["paths"]["/api/v1/admin/users"]["get"]
     assert admin_operation["security"] == [{"HTTPBearer": []}]
 

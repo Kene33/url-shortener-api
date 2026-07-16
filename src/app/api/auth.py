@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.dependencies import get_auth_service, get_current_user, get_settings
 from app.core.config import Settings
@@ -8,26 +8,29 @@ from app.core.errors import APIError
 from app.db.sql.crud import UserRecord
 from app.schemas.auth import (
     ActionMessageResponse,
+    LoginChallengeResponse,
     LoginRequest,
-    LogoutRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
-    RefreshRequest,
     RegisterRequest,
     RegisterResponse,
     TokenResponse,
+    TwoFactorVerifyRequest,
     UserResponse,
     VerifyEmailRequest,
 )
 from app.schemas.links import ErrorResponse, ValidationErrorResponse
 from app.services.auth import (
     AuthService,
+    EmailAlreadyInUseError,
     EmailAlreadyRegisteredError,
     EmailNotVerifiedError,
     InactiveUserError,
     InvalidCredentialsError,
     InvalidTokenError,
+    InvalidTwoFactorCodeError,
     IssuedTokens,
+    TwoFactorRequiredError,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
@@ -39,37 +42,65 @@ AUTH_RESPONSES = {
 }
 
 
-def token_response(tokens: IssuedTokens) -> TokenResponse:
-    return TokenResponse(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-        expires_in=tokens.expires_in,
-        user=UserResponse.model_validate(tokens.user),
+def user_response(user: UserRecord, settings: Settings) -> UserResponse:
+    avatar_url = None
+    if user.avatar_path:
+        base_url = str(settings.public_base_url).rstrip("/")
+        avatar_url = f"{base_url}/api/v1/me/avatar/{user.avatar_path}"
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        is_admin=user.is_admin,
+        is_active=user.is_active,
+        email_verified=user.email_verified,
+        display_name=user.display_name,
+        avatar_url=avatar_url,
+        pending_email=user.pending_email,
+        two_factor_enabled=user.two_factor_enabled,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
     )
 
 
-@router.post(
-    "/auth/register",
-    response_model=RegisterResponse,
-    response_model_exclude_none=True,
-    status_code=status.HTTP_201_CREATED,
-    summary="Зарегистрировать аккаунт",
-    responses={
-        409: {"model": ErrorResponse, "description": "Email уже зарегистрирован"},
-        422: AUTH_RESPONSES[422],
-        503: AUTH_RESPONSES[503],
-    },
-)
+def _set_refresh_cookie(response: Response, token: str, settings: Settings) -> None:
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=token,
+        httponly=True,
+        secure=settings.refresh_cookie_secure,
+        samesite=settings.refresh_cookie_samesite,
+        domain=settings.refresh_cookie_domain,
+        path=settings.refresh_cookie_path,
+        max_age=settings.refresh_token_days * 24 * 60 * 60,
+    )
+
+
+def _clear_refresh_cookie(response: Response, settings: Settings) -> None:
+    response.delete_cookie(
+        key=settings.refresh_cookie_name,
+        domain=settings.refresh_cookie_domain,
+        path=settings.refresh_cookie_path,
+        secure=settings.refresh_cookie_secure,
+        samesite=settings.refresh_cookie_samesite,
+    )
+
+
+def token_response(tokens: IssuedTokens, settings: Settings) -> TokenResponse:
+    return TokenResponse(
+        access_token=tokens.access_token,
+        expires_in=tokens.expires_in,
+        user=user_response(tokens.user, settings),
+    )
+
+
+@router.post("/auth/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> RegisterResponse:
     try:
-        user, verification_token = await service.register(
-            str(payload.email),
-            payload.password,
-        )
+        user, verification_token = await service.register(str(payload.email), payload.password)
     except EmailAlreadyRegisteredError as exc:
         raise APIError(
             status_code=status.HTTP_409_CONFLICT,
@@ -77,7 +108,7 @@ async def register(
             detail="An account with this email already exists",
         ) from exc
     return RegisterResponse(
-        user=UserResponse.model_validate(user),
+        user=user_response(user, settings),
         verification_required=True,
         verification_token=(
             verification_token if settings.environment.lower() != "production" else None
@@ -85,15 +116,11 @@ async def register(
     )
 
 
-@router.post(
-    "/auth/verify-email",
-    response_model=UserResponse,
-    summary="Подтвердить email",
-    responses={400: AUTH_RESPONSES[401], 422: AUTH_RESPONSES[422]},
-)
+@router.post("/auth/verify-email", response_model=UserResponse)
 async def verify_email(
     payload: VerifyEmailRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserResponse:
     try:
         user = await service.verify_email(payload.token)
@@ -103,19 +130,26 @@ async def verify_email(
             code="invalid_action_token",
             detail="Verification token is invalid or expired",
         ) from exc
-    return UserResponse.model_validate(user)
+    except EmailAlreadyInUseError as exc:
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            code="email_already_in_use",
+            detail="Email is already in use",
+        ) from exc
+    return user_response(user, settings)
 
 
 @router.post(
     "/auth/login",
-    response_model=TokenResponse,
-    summary="Войти в аккаунт",
-    responses=AUTH_RESPONSES,
+    response_model=TokenResponse | LoginChallengeResponse,
+    responses={**AUTH_RESPONSES, 403: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
 )
 async def login(
     payload: LoginRequest,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
-) -> TokenResponse:
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> TokenResponse | LoginChallengeResponse:
     try:
         tokens = await service.authenticate(str(payload.email), payload.password)
     except InvalidCredentialsError as exc:
@@ -136,56 +170,82 @@ async def login(
             code="user_inactive",
             detail="User account is disabled",
         ) from exc
-    return token_response(tokens)
+    except TwoFactorRequiredError as exc:
+        return LoginChallengeResponse(
+            login_token=exc.login_token,
+            expires_in=exc.expires_in,
+            debug_code=exc.debug_code,
+        )
+    _set_refresh_cookie(response, tokens.refresh_token, settings)
+    return token_response(tokens, settings)
 
 
-@router.post(
-    "/auth/refresh",
-    response_model=TokenResponse,
-    summary="Обновить сессию",
-    responses=AUTH_RESPONSES,
-)
-async def refresh(
-    payload: RefreshRequest,
+@router.post("/auth/2fa/verify", response_model=TokenResponse, responses=AUTH_RESPONSES)
+async def verify_login_two_factor(
+    payload: TwoFactorVerifyRequest,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
     try:
-        tokens = await service.rotate_refresh_token(payload.refresh_token)
+        tokens = await service.verify_login_two_factor(payload.login_token, payload.code)
+    except InvalidTwoFactorCodeError as exc:
+        raise APIError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="invalid_two_factor_code",
+            detail="Two-factor code is invalid or expired",
+        ) from exc
+    _set_refresh_cookie(response, tokens.refresh_token, settings)
+    return token_response(tokens, settings)
+
+
+@router.post("/auth/refresh", response_model=TokenResponse, responses=AUTH_RESPONSES)
+async def refresh(
+    request: Request,
+    response: Response,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> TokenResponse:
+    refresh_token = request.cookies.get(settings.refresh_cookie_name)
+    if not refresh_token:
+        raise APIError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="invalid_refresh_token",
+            detail="Refresh token cookie is missing",
+        )
+    try:
+        tokens = await service.rotate_refresh_token(refresh_token)
     except InvalidTokenError as exc:
+        _clear_refresh_cookie(response, settings)
         raise APIError(
             status_code=status.HTTP_401_UNAUTHORIZED,
             code="invalid_refresh_token",
             detail="Refresh token is invalid, expired or already used",
         ) from exc
     except (EmailNotVerifiedError, InactiveUserError) as exc:
+        _clear_refresh_cookie(response, settings)
         raise APIError(
             status_code=status.HTTP_403_FORBIDDEN,
             code="user_inactive",
             detail="User account cannot start a session",
         ) from exc
-    return token_response(tokens)
+    _set_refresh_cookie(response, tokens.refresh_token, settings)
+    return token_response(tokens, settings)
 
 
-@router.post(
-    "/auth/logout",
-    response_model=ActionMessageResponse,
-    response_model_exclude_none=True,
-    summary="Завершить сессию",
-)
+@router.post("/auth/logout", response_model=ActionMessageResponse)
 async def logout(
-    payload: LogoutRequest,
+    request: Request,
+    response: Response,
     service: Annotated[AuthService, Depends(get_auth_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ActionMessageResponse:
-    await service.logout(payload.refresh_token)
+    await service.logout(request.cookies.get(settings.refresh_cookie_name))
+    _clear_refresh_cookie(response, settings)
     return ActionMessageResponse(message="Session revoked")
 
 
-@router.post(
-    "/auth/password-reset/request",
-    response_model=ActionMessageResponse,
-    response_model_exclude_none=True,
-    summary="Запросить восстановление пароля",
-)
+@router.post("/auth/password-reset/request", response_model=ActionMessageResponse)
 async def request_password_reset(
     payload: PasswordResetRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -198,13 +258,7 @@ async def request_password_reset(
     )
 
 
-@router.post(
-    "/auth/password-reset/confirm",
-    response_model=ActionMessageResponse,
-    response_model_exclude_none=True,
-    summary="Установить новый пароль",
-    responses={400: AUTH_RESPONSES[401], 422: AUTH_RESPONSES[422]},
-)
+@router.post("/auth/password-reset/confirm", response_model=ActionMessageResponse)
 async def confirm_password_reset(
     payload: PasswordResetConfirmRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -220,13 +274,9 @@ async def confirm_password_reset(
     return ActionMessageResponse(message="Password updated; existing sessions revoked")
 
 
-@router.get(
-    "/me",
-    response_model=UserResponse,
-    summary="Получить текущего пользователя",
-    responses={401: AUTH_RESPONSES[401]},
-)
+@router.get("/me", response_model=UserResponse)
 async def current_user(
     user: Annotated[UserRecord, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserResponse:
-    return UserResponse.model_validate(user)
+    return user_response(user, settings)

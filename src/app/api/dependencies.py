@@ -51,7 +51,7 @@ async def get_optional_user(
             detail="Access token is invalid or expired",
         )
     user = await database.get_user_by_id(user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.deleted_at is not None:
         raise APIError(
             status_code=status.HTTP_401_UNAUTHORIZED,
             code="invalid_access_token",
@@ -82,7 +82,7 @@ async def get_current_user(
             detail="Access token is invalid or expired",
         )
     user = await database.get_user_by_id(user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.deleted_at is not None:
         raise APIError(
             status_code=status.HTTP_401_UNAUTHORIZED,
             code="invalid_access_token",

@@ -17,9 +17,7 @@ async def test_access_count_increment_is_atomic_under_concurrency(tmp_path):
     )
 
     increments = 25
-    await asyncio.gather(
-        *(database.increment_access_count("atomic01") for _ in range(increments))
-    )
+    await asyncio.gather(*(database.increment_access_count("atomic01") for _ in range(increments)))
     stored = await database.get_link_by_shortcode("atomic01")
 
     assert stored is not None
@@ -197,5 +195,17 @@ async def test_startup_creates_account_and_session_tables(tmp_path):
     finally:
         connection.close()
 
-    assert {"links", "users", "refresh_tokens", "action_tokens"} <= tables
-    assert user_version == 4
+    assert {
+        "links",
+        "users",
+        "refresh_tokens",
+        "action_tokens",
+        "folders",
+        "preferences",
+        "notifications",
+        "analytics_hourly",
+        "analytics_daily",
+        "admin_settings",
+        "two_factor_challenges",
+    } <= tables
+    assert user_version == 5
