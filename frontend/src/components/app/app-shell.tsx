@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Bell, FolderKanban, Home, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, User2, X } from "lucide-react";
 import type { PropsWithChildren } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,6 @@ const links = [
   { to: "/profile", label: "profile", icon: User2 },
   { to: "/notifications", label: "notifications", icon: Bell },
 ];
-
-const SIDEBAR_STORAGE_KEY = "linkcutter.sidebar-open";
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { logout } = useSession();
@@ -59,11 +57,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const profile = useProfileQuery({ enabled: Boolean(user) });
   const { t } = useTranslation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "false");
-
-  useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen));
-  }, [sidebarOpen]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   if (!user) {
     return <>{children}</>;
