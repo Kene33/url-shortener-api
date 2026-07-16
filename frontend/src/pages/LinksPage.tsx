@@ -1,6 +1,5 @@
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Dialog from "@radix-ui/react-dialog";
-import * as Switch from "@radix-ui/react-switch";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -77,7 +76,35 @@ function LinkRow({ item, folders, onCopied }: { item: LinkItem; folders: Array<{
   const folderName = folders.find((folder) => folder.id === item.folder_id)?.name ?? "Без папки";
   const save = () => { void mutation.mutateAsync({ label, folder_id: folderId ? Number(folderId) : null }).then(() => setEditing(false)); };
   const copyLink = () => void copyToClipboard(item.short_url).then(onCopied);
-  return <Card className="grid gap-4 md:grid-cols-[minmax(0,1fr)_110px_150px_190px] md:items-center"><div className="min-w-0 space-y-1"><button type="button" className="block max-w-full truncate font-medium text-accent hover:underline" title={`Копировать ${item.short_url}`} onClick={copyLink}>{item.shortcode}</button>{editing ? <><Input value={label} onChange={(event) => setLabel(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") save(); }} /><select className="h-9 w-full rounded-panel border border-border bg-panel px-2 text-sm text-text" value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">Без папки</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></> : <p className="m-0 text-sm">{item.label || "Без названия"}</p>}<p className="m-0 truncate text-xs text-subtle">{item.url}</p></div><div className="text-sm text-subtle">{item.access_count} переходов</div><div className="text-sm text-subtle">{formatDate(item.created_at)}<br />{folderName}</div><div className="flex items-center justify-end gap-1"><button className="pill" type="button" title="Копировать короткую ссылку" aria-label="Копировать короткую ссылку" onClick={copyLink}><Copy className="h-4 w-4" /></button><button className="pill" type="button" title={editing ? "Сохранить" : "Редактировать название и папку"} aria-label={editing ? "Сохранить" : "Редактировать название и папку"} onClick={editing ? save : () => setEditing(true)}>{editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}</button><AlertDialog.Root><AlertDialog.Trigger asChild><button className="pill text-danger" type="button" title="Удалить ссылку" aria-label="Удалить ссылку"><Trash2 className="h-4 w-4" /></button></AlertDialog.Trigger><AlertDialog.Portal><AlertDialog.Overlay className="fixed inset-0 bg-black/50" /><AlertDialog.Content className="fixed left-1/2 top-1/2 w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-panel border border-border bg-panel p-6"><AlertDialog.Title className="text-lg font-semibold">Удалить ссылку?</AlertDialog.Title><AlertDialog.Description className="mt-2 text-sm text-subtle">Ссылка будет отключена и начнёт отвечать 410. URL и shortcode сохранятся и повторно использоваться не будут.</AlertDialog.Description><div className="mt-5 flex gap-2"><AlertDialog.Cancel asChild><Button variant="secondary">Отмена</Button></AlertDialog.Cancel><AlertDialog.Action asChild><Button variant="danger" onClick={() => void mutation.mutateAsync({ is_active: false })}>Удалить</Button></AlertDialog.Action></div></AlertDialog.Content></AlertDialog.Portal></AlertDialog.Root><button className="pill" type="button" title={item.is_active ? "Отключить ссылку" : "Включить ссылку"} aria-label={item.is_active ? "Отключить ссылку" : "Включить ссылку"} onClick={() => void mutation.mutateAsync({ is_active: !item.is_active })}><Power className="h-4 w-4" /></button><Switch.Root checked={item.is_active} onCheckedChange={(checked) => mutation.mutate({ is_active: checked })} aria-label={item.is_active ? "Ссылка включена" : "Ссылка отключена"} className="relative h-6 w-11 rounded-full bg-border data-[state=checked]:bg-accent"><Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-white transition data-[state=checked]:translate-x-[22px]" /></Switch.Root></div></Card>;
+  return (
+    <Card className="grid gap-4 md:grid-cols-[minmax(0,1fr)_110px_150px_160px] md:items-center">
+      <div className="min-w-0 space-y-1">
+        <button type="button" className="block max-w-full truncate font-medium text-accent hover:underline" title={`Копировать ${item.short_url}`} onClick={copyLink}>{item.shortcode}</button>
+        {editing ? <><Input value={label} onChange={(event) => setLabel(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") save(); }} /><select className="h-9 w-full rounded-panel border border-border bg-panel px-2 text-sm text-text" value={folderId} onChange={(event) => setFolderId(event.target.value)}><option value="">Без папки</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></> : <p className="m-0 text-sm">{item.label || "Без названия"}</p>}
+        <p className="m-0 truncate text-xs text-subtle">{item.url}</p>
+      </div>
+      <div className="text-sm text-subtle">{item.access_count} переходов</div>
+      <div className="text-sm text-subtle">{formatDate(item.created_at)}<br />{folderName}</div>
+      <div className="flex items-center justify-end gap-1">
+        <button className="pill" type="button" title="Копировать короткую ссылку" aria-label="Копировать короткую ссылку" onClick={copyLink}><Copy className="h-4 w-4" /></button>
+        <button className="pill" type="button" title={editing ? "Сохранить" : "Редактировать название и папку"} aria-label={editing ? "Сохранить" : "Редактировать название и папку"} onClick={editing ? save : () => setEditing(true)}>{editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}</button>
+        <AlertDialog.Root>
+          <AlertDialog.Trigger asChild><button className="pill text-danger" type="button" title="Удалить ссылку" aria-label="Удалить ссылку"><Trash2 className="h-4 w-4" /></button></AlertDialog.Trigger>
+          <AlertDialog.Portal><AlertDialog.Overlay className="fixed inset-0 bg-black/50" /><AlertDialog.Content className="fixed left-1/2 top-1/2 w-[min(92vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-panel border border-border bg-panel p-6"><AlertDialog.Title className="text-lg font-semibold">Удалить ссылку?</AlertDialog.Title><AlertDialog.Description className="mt-2 text-sm text-subtle">Ссылка будет отключена и начнёт отвечать 410. URL и shortcode сохранятся и повторно использоваться не будут.</AlertDialog.Description><div className="mt-5 flex gap-2"><AlertDialog.Cancel asChild><Button variant="secondary">Отмена</Button></AlertDialog.Cancel><AlertDialog.Action asChild><Button variant="danger" onClick={() => void mutation.mutateAsync({ is_active: false })}>Удалить</Button></AlertDialog.Action></div></AlertDialog.Content></AlertDialog.Portal>
+        </AlertDialog.Root>
+        <button
+          className={`pill ${item.is_active ? "border-accent/50 bg-accent/10 text-accent" : "text-subtle"}`}
+          type="button"
+          title={item.is_active ? "Отключить ссылку" : "Включить ссылку"}
+          aria-label={item.is_active ? "Отключить ссылку" : "Включить ссылку"}
+          onClick={() => void mutation.mutateAsync({ is_active: !item.is_active })}
+          disabled={mutation.isPending}
+        >
+          <Power className="h-4 w-4" />
+        </button>
+      </div>
+    </Card>
+  );
 }
 
 function CopyToast({ onClose }: { onClose: () => void }) {
