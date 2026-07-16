@@ -66,8 +66,8 @@ async def test_concurrent_guest_requests_share_one_shortcode(app_factory):
     "url",
     [
         "",
-        "example.com/no-scheme",
         "ftp://example.com/file",
+        "file:///etc/passwd",
         "https://user:secret@example.com/private",
     ],
 )
@@ -76,6 +76,23 @@ async def test_create_guest_link_rejects_invalid_urls(app_factory, url):
         response = await harness.client.post("/api/v1/links", json={"url": url})
 
     assert_validation_error(response)
+
+
+@pytest.mark.asyncio
+async def test_create_guest_link_accepts_a_bare_domain_as_https(app_factory):
+    async with app_factory() as harness:
+        first = await harness.client.post("/api/v1/links", json={"url": "google.com"})
+        duplicate = await harness.client.post(
+            "/api/v1/links",
+            json={"url": "https://google.com/"},
+        )
+        redirect = await harness.client.get(f"/{first.json()['shortcode']}")
+
+    assert first.status_code == 201
+    assert duplicate.status_code == 200
+    assert first.json()["shortcode"] == duplicate.json()["shortcode"]
+    assert redirect.status_code == 307
+    assert redirect.headers["location"] == "https://google.com/"
 
 
 @pytest.mark.asyncio

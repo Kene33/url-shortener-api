@@ -10,10 +10,12 @@ from pydantic import (
     field_validator,
 )
 
-from app.utils.urls import http_url_adapter, normalize_url
+from app.utils.urls import add_default_scheme, http_url_adapter, normalize_url
 
 MAX_URL_LENGTH = 2048
 SHORTCODE_PATTERN = r"^[A-Za-z0-9]+$"
+
+
 class CreateLinkRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -22,7 +24,7 @@ class CreateLinkRequest(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url(cls, value: str) -> str:
-        candidate = value.strip()
+        candidate = add_default_scheme(value)
         parsed = http_url_adapter.validate_python(candidate)
 
         if parsed.username is not None or parsed.password is not None:
@@ -41,7 +43,7 @@ class CreateLinkRequest(BaseModel):
 
         if len(str(parsed)) > MAX_URL_LENGTH:
             raise ValueError(f"URL must not exceed {MAX_URL_LENGTH} characters")
-        return candidate
+        return str(parsed)
 
     @property
     def normalized_url(self) -> str:
