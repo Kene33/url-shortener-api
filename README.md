@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./docs/readme-assets/logo.svg" alt="LinkCutter logo" width="220" />
+  # <img src="./docs/readme-assets/logo.svg" alt="LinkCutter logo" width="220" />
   <h1>LinkCutter</h1>
   <p><strong>FastAPI and React link shortener with guest links, account workspaces, analytics, and admin moderation.</strong></p>
   <p><strong>Сервис коротких ссылок на FastAPI и React с гостевым режимом, личным кабинетом, аналитикой и админ-модерацией.</strong></p>
