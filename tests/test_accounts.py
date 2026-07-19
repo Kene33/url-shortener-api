@@ -265,7 +265,13 @@ async def test_admin_can_manage_users_and_moderate_all_links_and_settings(app_fa
         moderated = await harness.client.patch(
             f"/api/v1/admin/links/{owned.json()['shortcode']}",
             headers=bearer(admin_tokens),
-            json={"label": "Moderated", "is_active": False},
+            json={
+                "label": "Moderated",
+                "is_active": False,
+                "category": "abuse",
+                "comment": "Confirmed abuse",
+                "password_confirmation": "StrongPass123!",
+            },
         )
         assert moderated.status_code == 200
         assert moderated.json()["owner_email"] == "regular@example.com"
@@ -281,7 +287,7 @@ async def test_admin_can_manage_users_and_moderate_all_links_and_settings(app_fa
         disabled_user = await harness.client.patch(
             f"/api/v1/admin/users/{regular_user['id']}",
             headers=bearer(admin_tokens),
-            json={"is_active": False},
+            json={"is_active": False, "password_confirmation": "StrongPass123!"},
         )
         assert disabled_user.status_code == 200
         assert disabled_user.json()["is_active"] is False
@@ -303,6 +309,6 @@ async def test_admin_can_manage_users_and_moderate_all_links_and_settings(app_fa
         self_demote = await harness.client.patch(
             f"/api/v1/admin/users/{admin_user['id']}",
             headers=bearer(admin_tokens),
-            json={"is_admin": False},
+            json={"role": "user", "password_confirmation": "StrongPass123!"},
         )
         assert self_demote.status_code == 409

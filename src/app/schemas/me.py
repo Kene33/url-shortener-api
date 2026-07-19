@@ -108,6 +108,12 @@ class DeleteAccountRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class DeletionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password_confirmation: str = Field(min_length=8, max_length=128)
+
+
 class AdminSettingsResponse(BaseModel):
     user_link_retention_days: int
     updated_at: str

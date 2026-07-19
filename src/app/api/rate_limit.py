@@ -5,6 +5,7 @@ from app.core.errors import APIError
 from app.core.security import hash_token
 from app.services.rate_limit import (
     RateLimitExceededError,
+    RateLimitBackendUnavailableError,
     RateLimiter,
     RateLimitPolicy,
     RateLimitStatus,
@@ -20,11 +21,47 @@ def guest_link_policy(settings: Settings) -> RateLimitPolicy:
 
 
 def auth_action_policy(settings: Settings, scope: str) -> RateLimitPolicy:
+    fixed = {
+        "auth_register": (5, 3600),
+        "auth_login_ip": (10, 900),
+        "auth_login_email": (5, 900),
+        "auth_password_reset_request_ip": (5, 3600),
+        "auth_password_reset_request_email": (3, 3600),
+    }.get(scope)
+    if fixed:
+        return RateLimitPolicy(
+            scope=scope,
+            limit=fixed[0],
+            window_seconds=fixed[1],
+            fail_closed=settings.environment.lower() == "production"
+            and settings.rate_limit_fail_closed_in_production,
+        )
     return RateLimitPolicy(
         scope=scope,
         limit=settings.auth_action_rate_limit_requests,
         window_seconds=settings.auth_action_rate_limit_window_seconds,
+        fail_closed=settings.environment.lower() == "production"
+        and settings.rate_limit_fail_closed_in_production,
     )
+
+
+def admin_policy(settings: Settings, mutation: bool) -> RateLimitPolicy:
+    return RateLimitPolicy(
+        scope="admin_mutation" if mutation else "admin_read",
+        limit=20 if mutation else 120,
+        window_seconds=600 if mutation else 60,
+        fail_closed=settings.environment.lower() == "production"
+        and settings.rate_limit_fail_closed_in_production,
+    )
+
+
+def report_policies(
+    settings: Settings, request: Request, email: str
+) -> list[tuple[RateLimitPolicy, str]]:
+    return [
+        (RateLimitPolicy("public_report_email", 5, 3600), rate_limit_subject(request, email)),
+        (RateLimitPolicy("public_report_ip", 20, 86400), rate_limit_subject(request)),
+    ]
 
 
 def rate_limit_subject(request: Request, *identifiers: str | int | None) -> str:
@@ -54,6 +91,12 @@ async def enforce_rate_limit(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             code="rate_limit_exceeded",
             detail=f"Too many requests; retry in {exc.status.reset_after_seconds} seconds",
+        ) from exc
+    except RateLimitBackendUnavailableError as exc:
+        raise APIError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            code="rate_limit_unavailable",
+            detail="Rate limiting backend is unavailable",
         ) from exc
     _apply_limit_headers(response, limit)
 

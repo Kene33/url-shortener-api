@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 import asyncio
 import json
 import sqlite3
@@ -23,7 +24,8 @@ QUALIFIED_LINK_COLUMNS = """
 USER_COLUMNS = """
     id, email, password_hash, is_admin, is_active, email_verified,
     display_name, avatar_path, pending_email, deleted_at, links_expire_at,
-    two_factor_enabled, created_at, updated_at
+    two_factor_enabled, role, deletion_requested_at, deletion_scheduled_for,
+    anonymized_at, created_at, updated_at
 """
 FOLDER_COLUMNS = "id, user_id, name, color, created_at, updated_at"
 PREFERENCES_COLUMNS = """
@@ -67,6 +69,10 @@ class UserRecord:
     deleted_at: str | None
     links_expire_at: str | None
     two_factor_enabled: bool
+    role: str
+    deletion_requested_at: str | None
+    deletion_scheduled_for: str | None
+    anonymized_at: str | None
     created_at: str
     updated_at: str
 
@@ -158,7 +164,8 @@ class SQLClient:
             await self._ensure_user_columns(db)
             await self._ensure_link_columns(db)
             await self._ensure_action_token_columns(db)
-            await db.execute("PRAGMA user_version = 5")
+            await self._ensure_governance_schema(db)
+            await db.execute("PRAGMA user_version = 6")
             await db.commit()
 
     async def create_user(
@@ -172,11 +179,17 @@ class SQLClient:
         async with self._connect() as db:
             cursor = await db.execute(
                 f"""
-                INSERT INTO users (email, password_hash, is_admin, email_verified)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO users (email, password_hash, is_admin, role, email_verified)
+                VALUES (?, ?, ?, ?, ?)
                 RETURNING {USER_COLUMNS}
                 """,
-                (email, password_hash, int(is_admin), int(email_verified)),
+                (
+                    email,
+                    password_hash,
+                    int(is_admin),
+                    "admin" if is_admin else "user",
+                    int(email_verified),
+                ),
             )
             user = self._to_user(await cursor.fetchone())
             await db.execute(
@@ -812,6 +825,128 @@ class SQLClient:
                     connection=db,
                 )
             await db.commit()
+        return user
+
+    async def update_user_governance_fields(
+        self, user_id: int, *, role: str | None, is_active: bool | None
+    ) -> UserRecord | None:
+        assignments = ["updated_at = CURRENT_TIMESTAMP"]
+        params: list[object] = []
+        if role is not None:
+            assignments.extend(["role = ?", "is_admin = ?"])
+            params.extend([role, int(role == "admin")])
+        if is_active is not None:
+            assignments.append("is_active = ?")
+            params.append(int(is_active))
+        params.append(user_id)
+        async with self._connect() as db:
+            cursor = await db.execute(
+                f"UPDATE users SET {', '.join(assignments)} WHERE id = ? RETURNING {USER_COLUMNS}",
+                params,
+            )
+            user = self._to_user(await cursor.fetchone())
+            if user is not None and is_active is False:
+                await db.execute(
+                    "UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP) WHERE user_id = ?",
+                    (user_id,),
+                )
+            await db.commit()
+            return user
+
+    async def list_users_governance(
+        self,
+        *,
+        q: str | None,
+        role: str | None,
+        is_active: bool | None,
+        email_verified: bool | None,
+        deletion_state: str | None,
+        registered_from: str | None,
+        registered_to: str | None,
+        sort: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[UserRecord], int]:
+        clauses: list[str] = []
+        params: list[object] = []
+        if q:
+            clauses.append("email LIKE ?")
+            params.append(f"%{q.strip()}%")
+        for column, value in (
+            ("role", role),
+            ("is_active", None if is_active is None else int(is_active)),
+            ("email_verified", None if email_verified is None else int(email_verified)),
+        ):
+            if value is not None:
+                clauses.append(f"{column} = ?")
+                params.append(value)
+        if deletion_state == "requested":
+            clauses.append("deletion_requested_at IS NOT NULL AND anonymized_at IS NULL")
+        elif deletion_state == "anonymized":
+            clauses.append("anonymized_at IS NOT NULL")
+        elif deletion_state == "none":
+            clauses.append("deletion_requested_at IS NULL AND anonymized_at IS NULL")
+        if registered_from:
+            clauses.append("created_at >= ?")
+            params.append(registered_from)
+        if registered_to:
+            clauses.append("created_at <= ?")
+            params.append(registered_to)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        ordering = {
+            "created_at_desc": "created_at DESC, id DESC",
+            "created_at_asc": "created_at ASC, id ASC",
+            "email_asc": "email ASC",
+            "email_desc": "email DESC",
+        }[sort]
+        async with self._connect() as db:
+            cursor = await db.execute(f"SELECT COUNT(*) FROM users {where}", params)
+            total = (await cursor.fetchone())[0]
+            cursor = await db.execute(
+                f"SELECT {USER_COLUMNS} FROM users {where} ORDER BY {ordering} LIMIT ? OFFSET ?",
+                [*params, limit, offset],
+            )
+            return [u for row in await cursor.fetchall() if (u := self._to_user(row))], total
+
+    async def request_account_deletion(self, user_id: int) -> UserRecord | None:
+        scheduled = (datetime.now(UTC) + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        async with self._connect() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                f"""UPDATE users SET is_active=0, deletion_requested_at=CURRENT_TIMESTAMP,
+                deletion_scheduled_for=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND anonymized_at IS NULL RETURNING {USER_COLUMNS}""",
+                (scheduled, user_id),
+            )
+            user = self._to_user(await cursor.fetchone())
+            if user is None:
+                await db.rollback()
+                return None
+            await db.execute(
+                "UPDATE refresh_tokens SET revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP) WHERE user_id=?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE links SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE owner_id=?",
+                (user_id,),
+            )
+            await db.commit()
+            return user
+
+    async def cancel_account_deletion(self, user_id: int) -> UserRecord | None:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                f"""UPDATE users SET is_active=1, deletion_requested_at=NULL,
+                deletion_scheduled_for=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deletion_scheduled_for>CURRENT_TIMESTAMP
+                AND anonymized_at IS NULL RETURNING {USER_COLUMNS}""",
+                (user_id,),
+            )
+            user = self._to_user(await cursor.fetchone())
+            if user:
+                await db.execute(
+                    "UPDATE links SET is_active=1, updated_at=CURRENT_TIMESTAMP WHERE owner_id=?",
+                    (user_id,),
+                )
+            await db.commit()
             return user
 
     async def increment_access_count(self, shortcode: str) -> LinkRecord | None:
@@ -1291,6 +1426,213 @@ class SQLClient:
             await db.commit()
             return user
 
+    async def anonymize_account(self, user_id: int) -> UserRecord | None:
+        async with self._connect() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                f"""UPDATE users SET is_active=0, email=?, password_hash=?, display_name=NULL,
+                avatar_path=NULL, pending_email=NULL, email_verified=0, two_factor_enabled=0,
+                deleted_at=COALESCE(deleted_at,CURRENT_TIMESTAMP), anonymized_at=CURRENT_TIMESTAMP,
+                deletion_scheduled_for=NULL, updated_at=CURRENT_TIMESTAMP
+                WHERE id=? AND anonymized_at IS NULL RETURNING {USER_COLUMNS}""",
+                (f"deleted-user-{user_id}@deleted.local", f"anonymized:{user_id}", user_id),
+            )
+            user = self._to_user(await cursor.fetchone())
+            if user is None:
+                await db.rollback()
+                return None
+            await db.execute(
+                "UPDATE refresh_tokens SET revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP) WHERE user_id=?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE links SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE owner_id=?",
+                (user_id,),
+            )
+            await db.commit()
+            return user
+
+    async def create_report(
+        self, *, email: str, shortcode: str, category: str, comment: str
+    ) -> None:
+        async with self._connect() as db:
+            await db.execute(
+                "INSERT INTO reports (reporter_email, shortcode, category, comment) VALUES (?, ?, ?, ?)",
+                (email, shortcode, category, comment),
+            )
+            await db.commit()
+
+    async def list_reports(
+        self, *, report_status: str | None, category: str | None, limit: int, offset: int
+    ) -> tuple[list[dict[str, object]], int]:
+        clauses = []
+        params = []
+        if report_status:
+            clauses.append("status=?")
+            params.append(report_status)
+        if category:
+            clauses.append("category=?")
+            params.append(category)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        async with self._connect() as db:
+            total = (
+                await (await db.execute(f"SELECT COUNT(*) FROM reports {where}", params)).fetchone()
+            )[0]
+            rows = await (
+                await db.execute(
+                    f"SELECT id,reporter_email,shortcode,category,comment,status,resolution_comment,resolved_by,resolved_at,created_at,updated_at FROM reports {where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
+                    [*params, limit, offset],
+                )
+            ).fetchall()
+            keys = (
+                "id",
+                "reporter_email",
+                "shortcode",
+                "category",
+                "comment",
+                "status",
+                "resolution_comment",
+                "resolved_by",
+                "resolved_at",
+                "created_at",
+                "updated_at",
+            )
+            return [dict(zip(keys, row, strict=True)) for row in rows], total
+
+    async def get_report(self, report_id: int) -> dict[str, object] | None:
+        rows, _ = await self.list_reports(report_status=None, category=None, limit=100000, offset=0)
+        return next((row for row in rows if row["id"] == report_id), None)
+
+    async def resolve_report(
+        self, report_id: int, *, report_status: str, comment: str | None, actor_id: int
+    ) -> dict[str, object] | None:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                """UPDATE reports SET status=?,resolution_comment=?,resolved_by=?,resolved_at=CASE WHEN ? IN ('resolved','rejected') THEN CURRENT_TIMESTAMP ELSE NULL END,updated_at=CURRENT_TIMESTAMP WHERE id=? RETURNING id,reporter_email,shortcode,category,comment,status,resolution_comment,resolved_by,resolved_at,created_at,updated_at""",
+                (report_status, comment, actor_id, report_status, report_id),
+            )
+            row = await cursor.fetchone()
+            await db.commit()
+            if row is None:
+                return None
+            keys = (
+                "id",
+                "reporter_email",
+                "shortcode",
+                "category",
+                "comment",
+                "status",
+                "resolution_comment",
+                "resolved_by",
+                "resolved_at",
+                "created_at",
+                "updated_at",
+            )
+            return dict(zip(keys, row, strict=True))
+
+    async def add_moderation_action(
+        self, *, shortcode: str, actor_id: int, action: str, category: str | None, comment: str
+    ) -> None:
+        async with self._connect() as db:
+            await db.execute(
+                "INSERT INTO link_moderation_actions (shortcode,actor_id,action,category,comment) VALUES (?,?,?,?,?)",
+                (shortcode, actor_id, action, category, comment),
+            )
+            await db.commit()
+
+    async def get_link_history(self, shortcode: str) -> list[dict[str, object]]:
+        async with self._connect() as db:
+            rows = await (
+                await db.execute(
+                    "SELECT id,shortcode,actor_id,action,category,comment,created_at FROM link_moderation_actions WHERE shortcode=? ORDER BY created_at DESC,id DESC",
+                    (shortcode,),
+                )
+            ).fetchall()
+            keys = ("id", "shortcode", "actor_id", "action", "category", "comment", "created_at")
+            return [dict(zip(keys, row, strict=True)) for row in rows]
+
+    async def add_audit_log(
+        self,
+        *,
+        actor_id: int | None,
+        actor_role: str | None,
+        action: str,
+        object_type: str,
+        object_id: str,
+        old_value: dict[str, object] | None = None,
+        new_value: dict[str, object] | None = None,
+        route: str | None = None,
+        ip_hash: str | None = None,
+    ) -> None:
+        async with self._connect() as db:
+            await db.execute(
+                "INSERT INTO audit_log (actor_id,actor_role,action,object_type,object_id,old_value_json,new_value_json,route,ip_hash) VALUES (?,?,?,?,?,?,?,?,?)",
+                (
+                    actor_id,
+                    actor_role,
+                    action,
+                    object_type,
+                    object_id,
+                    json.dumps(old_value) if old_value else None,
+                    json.dumps(new_value) if new_value else None,
+                    route,
+                    ip_hash,
+                ),
+            )
+            await db.commit()
+
+    async def list_audit_log(
+        self,
+        *,
+        actor_id: int | None,
+        action: str | None,
+        object_type: str | None,
+        date_from: str | None,
+        date_to: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[dict[str, object]], int]:
+        clauses = []
+        params = []
+        for col, val in (("actor_id", actor_id), ("action", action), ("object_type", object_type)):
+            if val is not None:
+                clauses.append(f"{col}=?")
+                params.append(val)
+        if date_from:
+            clauses.append("created_at>=?")
+            params.append(date_from)
+        if date_to:
+            clauses.append("created_at<=?")
+            params.append(date_to)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        async with self._connect() as db:
+            total = (
+                await (
+                    await db.execute(f"SELECT COUNT(*) FROM audit_log {where}", params)
+                ).fetchone()
+            )[0]
+            rows = await (
+                await db.execute(
+                    f"SELECT id,actor_id,actor_role,action,object_type,object_id,old_value_json,new_value_json,route,created_at FROM audit_log {where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
+                    [*params, limit, offset],
+                )
+            ).fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "actor_id": r[1],
+                    "actor_role": r[2],
+                    "action": r[3],
+                    "object_type": r[4],
+                    "object_id": r[5],
+                    "old_value": json.loads(r[6]) if r[6] else None,
+                    "new_value": json.loads(r[7]) if r[7] else None,
+                    "route": r[8],
+                    "created_at": r[9],
+                }
+                for r in rows
+            ], total
+
     async def create_two_factor_challenge(
         self,
         user_id: int,
@@ -1563,6 +1905,7 @@ class SQLClient:
                 email TEXT NOT NULL UNIQUE COLLATE NOCASE,
                 password_hash TEXT NOT NULL,
                 is_admin INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1)),
+                role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user','support','moderator','admin')),
                 is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
                 email_verified INTEGER NOT NULL DEFAULT 0 CHECK (email_verified IN (0, 1)),
                 display_name TEXT,
@@ -1570,6 +1913,9 @@ class SQLClient:
                 pending_email TEXT UNIQUE COLLATE NOCASE,
                 deleted_at TEXT,
                 links_expire_at TEXT,
+                deletion_requested_at TEXT,
+                deletion_scheduled_for TEXT,
+                anonymized_at TEXT,
                 two_factor_enabled INTEGER NOT NULL DEFAULT 0
                     CHECK (two_factor_enabled IN (0, 1)),
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1735,6 +2081,9 @@ class SQLClient:
     async def _ensure_user_columns(self, db: aiosqlite.Connection) -> None:
         columns = await self._table_columns(db, "users")
         additions = {
+            "is_admin": "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+            "is_active": "ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1",
+            "email_verified": "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
             "display_name": "ALTER TABLE users ADD COLUMN display_name TEXT",
             "avatar_path": "ALTER TABLE users ADD COLUMN avatar_path TEXT",
             "pending_email": "ALTER TABLE users ADD COLUMN pending_email TEXT",
@@ -1745,6 +2094,10 @@ class SQLClient:
                 ADD COLUMN two_factor_enabled INTEGER NOT NULL DEFAULT 0
                 CHECK (two_factor_enabled IN (0, 1))
             """,
+            "role": "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'",
+            "deletion_requested_at": "ALTER TABLE users ADD COLUMN deletion_requested_at TEXT",
+            "deletion_scheduled_for": "ALTER TABLE users ADD COLUMN deletion_scheduled_for TEXT",
+            "anonymized_at": "ALTER TABLE users ADD COLUMN anonymized_at TEXT",
         }
         for key, statement in additions.items():
             if key not in columns:
@@ -1752,6 +2105,154 @@ class SQLClient:
         await db.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_pending_email ON users(pending_email)"
         )
+        await db.execute(
+            "UPDATE users SET role = CASE WHEN is_admin = 1 THEN 'admin' ELSE 'user' END WHERE role IS NULL OR role NOT IN ('user','support','moderator','admin')"
+        )
+
+    async def _ensure_governance_schema(self, db: aiosqlite.Connection) -> None:
+        await db.execute("""CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_email TEXT NOT NULL, shortcode TEXT NOT NULL,
+            category TEXT NOT NULL, comment TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open',
+            resolution_comment TEXT, resolved_by INTEGER REFERENCES users(id), resolved_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS link_moderation_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, shortcode TEXT NOT NULL, actor_id INTEGER NOT NULL REFERENCES users(id),
+            action TEXT NOT NULL, category TEXT, comment TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id INTEGER REFERENCES users(id), actor_role TEXT,
+            action TEXT NOT NULL, object_type TEXT NOT NULL, object_id TEXT NOT NULL, old_value_json TEXT,
+            new_value_json TEXT, route TEXT, ip_hash TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS retention_settings (
+            id INTEGER PRIMARY KEY CHECK(id=1), audit_log_days INTEGER NOT NULL DEFAULT 365,
+            report_days INTEGER NOT NULL DEFAULT 365, admin_access_attempt_days INTEGER NOT NULL DEFAULT 90,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS admin_access_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id INTEGER REFERENCES users(id), route TEXT NOT NULL,
+            reason TEXT NOT NULL, ip_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        await db.execute("INSERT OR IGNORE INTO retention_settings (id) VALUES (1)")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS ix_reports_status_created ON reports(status, created_at DESC)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS ix_audit_log_created ON audit_log(created_at DESC)"
+        )
+
+    async def get_retention_settings(self) -> dict[str, object]:
+        async with self._connect() as db:
+            row = await (
+                await db.execute(
+                    "SELECT audit_log_days,report_days,admin_access_attempt_days,updated_at FROM retention_settings WHERE id=1"
+                )
+            ).fetchone()
+            assert row is not None
+            return dict(
+                zip(
+                    ("audit_log_days", "report_days", "admin_access_attempt_days", "updated_at"),
+                    row,
+                    strict=True,
+                )
+            )
+
+    async def update_retention_settings(
+        self, *, audit_log_days: int, report_days: int, admin_access_attempt_days: int
+    ) -> dict[str, object]:
+        async with self._connect() as db:
+            row = await (
+                await db.execute(
+                    "UPDATE retention_settings SET audit_log_days=?,report_days=?,admin_access_attempt_days=?,updated_at=CURRENT_TIMESTAMP WHERE id=1 RETURNING audit_log_days,report_days,admin_access_attempt_days,updated_at",
+                    (audit_log_days, report_days, admin_access_attempt_days),
+                )
+            ).fetchone()
+            await db.commit()
+            assert row is not None
+            return dict(
+                zip(
+                    ("audit_log_days", "report_days", "admin_access_attempt_days", "updated_at"),
+                    row,
+                    strict=True,
+                )
+            )
+
+    async def get_dashboard(self) -> dict[str, object]:
+        async with self._connect() as db:
+            users = (
+                await (
+                    await db.execute("SELECT COUNT(*) FROM users WHERE anonymized_at IS NULL")
+                ).fetchone()
+            )[0]
+            links = await (
+                await db.execute(
+                    "SELECT COUNT(*),SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) FROM links"
+                )
+            ).fetchone()
+            reports = await (
+                await db.execute(
+                    "SELECT COUNT(*),SUM(CASE WHEN status IN ('open','in_review') THEN 1 ELSE 0 END) FROM reports"
+                )
+            ).fetchone()
+            recent = await (
+                await db.execute(
+                    "SELECT id,actor_id,actor_role,action,object_type,object_id,created_at FROM audit_log ORDER BY created_at DESC,id DESC LIMIT 10"
+                )
+            ).fetchall()
+            return {
+                "users_total": users,
+                "links_total": links[0],
+                "links_active": links[1] or 0,
+                "links_disabled": links[0] - (links[1] or 0),
+                "reports_total": reports[0],
+                "reports_open": reports[1] or 0,
+                "recent_actions": [
+                    dict(
+                        zip(
+                            (
+                                "id",
+                                "actor_id",
+                                "actor_role",
+                                "action",
+                                "object_type",
+                                "object_id",
+                                "created_at",
+                            ),
+                            r,
+                            strict=True,
+                        )
+                    )
+                    for r in recent
+                ],
+            }
+
+    async def record_admin_access_attempt(
+        self, *, actor_id: int | None, route: str, reason: str, ip_hash: str
+    ) -> None:
+        async with self._connect() as db:
+            await db.execute(
+                "INSERT INTO admin_access_attempts(actor_id,route,reason,ip_hash) VALUES(?,?,?,?)",
+                (actor_id, route, reason, ip_hash),
+            )
+            await db.commit()
+
+    async def run_governance_housekeeping(self) -> None:
+        async with self._connect() as db:
+            rows = await (
+                await db.execute(
+                    "SELECT id FROM users WHERE deletion_scheduled_for <= CURRENT_TIMESTAMP AND anonymized_at IS NULL"
+                )
+            ).fetchall()
+            await db.commit()
+        for row in rows:
+            await self.anonymize_account(row[0])
+        settings = await self.get_retention_settings()
+        async with self._connect() as db:
+            for table, column, days in (
+                ("audit_log", "created_at", settings["audit_log_days"]),
+                ("reports", "created_at", settings["report_days"]),
+                ("admin_access_attempts", "created_at", settings["admin_access_attempt_days"]),
+            ):
+                await db.execute(
+                    f"DELETE FROM {table} WHERE {column} < datetime('now', ?)", (f"-{days} days",)
+                )
+            await db.commit()
 
     async def _ensure_link_columns(self, db: aiosqlite.Connection) -> None:
         columns = await self._table_columns(db, "links")
@@ -1949,8 +2450,12 @@ class SQLClient:
             deleted_at=row[9],
             links_expire_at=row[10],
             two_factor_enabled=bool(row[11]),
-            created_at=row[12],
-            updated_at=row[13],
+            role=row[12],
+            deletion_requested_at=row[13],
+            deletion_scheduled_for=row[14],
+            anonymized_at=row[15],
+            created_at=row[16],
+            updated_at=row[17],
         )
 
     @staticmethod

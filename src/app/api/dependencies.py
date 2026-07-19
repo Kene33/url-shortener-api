@@ -99,10 +99,27 @@ async def get_current_user(
 async def require_admin(
     user: Annotated[UserRecord, Depends(get_current_user)],
 ) -> UserRecord:
-    if not user.is_admin:
+    if user.role != "admin":
         raise APIError(
             status_code=status.HTTP_403_FORBIDDEN,
             code="admin_required",
             detail="Administrator privileges are required",
         )
     return user
+
+
+def require_roles(*roles: str):
+    async def dependency(user: Annotated[UserRecord, Depends(get_current_user)]) -> UserRecord:
+        if user.role not in roles:
+            raise APIError(
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="admin_required",
+                detail="Staff privileges are required",
+            )
+        return user
+
+    return dependency
+
+
+require_support_or_admin = require_roles("support", "admin")
+require_moderator_or_admin = require_roles("moderator", "admin")

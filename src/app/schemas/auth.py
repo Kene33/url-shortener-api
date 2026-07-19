@@ -54,6 +54,7 @@ class UserResponse(BaseModel):
     id: int
     email: EmailStr
     is_admin: bool
+    role: Literal["user", "support", "moderator", "admin"]
     is_active: bool
     email_verified: bool
     display_name: str | None
@@ -88,6 +89,12 @@ class ActionMessageResponse(BaseModel):
     message: str
     action_token: str | None = None
     debug_code: str | None = None
+
+
+class CancelDeletionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action_token: str = Field(min_length=32, max_length=512)
 
 
 class ChangePasswordRequest(BaseModel):

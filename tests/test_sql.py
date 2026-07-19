@@ -208,7 +208,7 @@ async def test_startup_creates_account_and_session_tables(tmp_path):
         "admin_settings",
         "two_factor_challenges",
     } <= tables
-    assert user_version == 5
+    assert user_version == 6
 
 
 @pytest.mark.asyncio

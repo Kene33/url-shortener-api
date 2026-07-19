@@ -213,7 +213,7 @@ async def test_email_two_factor_flow_and_account_deletion_retention(app_factory)
         assert cannot_login.status_code in {401, 403}
 
         still_resolves = await harness.client.get(f"/{shortcode}")
-        assert still_resolves.status_code == 307
+        assert still_resolves.status_code == 410
 
         connection = sqlite3.connect(harness.database.database_path)
         try:
@@ -227,4 +227,4 @@ async def test_email_two_factor_flow_and_account_deletion_retention(app_factory)
 
         expired = await harness.client.get(f"/{shortcode}")
         assert expired.status_code == 410
-        assert expired.json()["code"] == "link_expired"
+        assert expired.json()["code"] == "link_disabled"

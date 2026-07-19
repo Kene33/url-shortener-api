@@ -146,9 +146,9 @@ Use `demo-admin@example.com` or `demo-user@example.com` with the password you su
 | Auth | `/api/v1/auth/*`, `GET /api/v1/me` | Register, verify email, login, refresh, logout, password reset, 2FA login challenge |
 | Personal workspace | `/api/v1/me/links*`, `/api/v1/me/folders*` | Link lists, search, sorting, labels, folders, active state |
 | Analytics | `/api/v1/me/analytics`, `/api/v1/me/links/{shortcode}/analytics` | Summary metrics, time buckets, top links, timezone-aware queries |
-| Profile and account | `/api/v1/me/profile`, `/api/v1/me/avatar`, `/api/v1/me/preferences`, `/api/v1/me/export`, `DELETE /api/v1/me` | Profile edits, avatar upload, theme and language settings, JSON export, account deletion |
+| Profile and account | `/api/v1/me/profile`, `/api/v1/me/avatar`, `/api/v1/me/preferences`, `/api/v1/me/export`, `/api/v1/me/deletion/request` | Profile edits, optional email verification and email 2FA, JSON export, 30-day deletion cancellation window |
 | Notifications | `/api/v1/me/notifications*` | List, mark one read, mark all read |
-| Admin | `/api/v1/admin/users*`, `/api/v1/admin/links*`, `/api/v1/admin/settings*` | User moderation, link moderation, link-retention settings |
+| Admin | `/api/v1/admin/dashboard`, `/api/v1/admin/users*`, `/api/v1/admin/links*`, `/api/v1/admin/reports*`, `/api/v1/admin/audit-log`, `/api/v1/admin/settings/retention` | RBAC, moderation, reports, audit trail, and retention settings |
 | Health | `/health/live`, `/health/ready` | Process status, SQLite check, Redis status |
 
 Backend rules worth knowing:
@@ -157,6 +157,16 @@ Backend rules worth knowing:
 - Bare domains normalize to `https://...`.
 - The API rejects credentials in URLs and non-global targets such as `localhost` and private IP ranges.
 - Owners and admins can change labels and active state. They cannot change the target URL or shortcode.
+- Email verification and email-based 2FA are available but disabled by default for local development.
+- `support` can read users and audit records; `moderator` manages reports and link moderation; `admin` manages roles, retention, and account anonymization. Dangerous staff actions require the actor's password.
+
+### Redirect Load Scenario
+
+Install development dependencies, create a known shortcode such as `demo0001`, then run the scenario outside CI:
+
+```bash
+locust -f tests/load/locustfile.py --host=http://127.0.0.1:8000
+```
 
 ## Testing
 

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     guest_link_rate_limit_window_seconds: int = Field(default=60, ge=1, le=86400)
     auth_action_rate_limit_requests: int = Field(default=10, ge=1, le=10000)
     auth_action_rate_limit_window_seconds: int = Field(default=300, ge=1, le=86400)
+    rate_limit_fail_closed_in_production: bool = True
     cache_ttl_seconds: int = Field(default=3600, ge=1)
     shortcode_length: int = Field(default=8, ge=6, le=32)
     shortcode_max_attempts: int = Field(default=10, ge=1, le=100)

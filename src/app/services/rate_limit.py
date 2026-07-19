@@ -14,6 +14,7 @@ class RateLimitPolicy:
     scope: str
     limit: int
     window_seconds: int
+    fail_closed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +27,10 @@ class RateLimitStatus:
 class RateLimitExceededError(Exception):
     def __init__(self, status: RateLimitStatus) -> None:
         self.status = status
+
+
+class RateLimitBackendUnavailableError(Exception):
+    pass
 
 
 class RateLimiter:
@@ -49,6 +54,8 @@ class RateLimiter:
             try:
                 return await self._consume_redis(policy, subject)
             except (RedisError, OSError) as exc:
+                if policy.fail_closed:
+                    raise RateLimitBackendUnavailableError() from exc
                 logger.warning(
                     "Redis unavailable for rate limiting scope=%s, using in-memory fallback",
                     policy.scope,

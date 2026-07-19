@@ -2,7 +2,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.api.dependencies import get_auth_service, get_current_user, get_rate_limiter, get_settings
+from app.api.dependencies import (
+    get_auth_service,
+    get_current_user,
+    get_rate_limiter,
+    get_settings,
+    get_database,
+)
 from app.api.rate_limit import auth_action_policy, enforce_rate_limit, rate_limit_subject
 from app.core.config import Settings
 from app.core.errors import APIError
@@ -19,7 +25,10 @@ from app.schemas.auth import (
     TwoFactorVerifyRequest,
     UserResponse,
     VerifyEmailRequest,
+    CancelDeletionRequest,
 )
+from app.core.security import hash_token
+from app.db.sql.crud import SQLClient
 from app.schemas.links import ErrorResponse, ValidationErrorResponse
 from app.services.auth import (
     AuthService,
@@ -54,6 +63,7 @@ def user_response(user: UserRecord, settings: Settings) -> UserResponse:
         id=user.id,
         email=user.email,
         is_admin=user.is_admin,
+        role=user.role,
         is_active=user.is_active,
         email_verified=user.email_verified,
         display_name=user.display_name,
@@ -108,7 +118,7 @@ async def register(
     await enforce_rate_limit(
         limiter=rate_limiter,
         policy=auth_action_policy(settings, "auth_register"),
-        subject=rate_limit_subject(request, payload.email),
+        subject=rate_limit_subject(request),
         response=response,
     )
     try:
@@ -177,7 +187,13 @@ async def login(
 ) -> TokenResponse | LoginChallengeResponse:
     await enforce_rate_limit(
         limiter=rate_limiter,
-        policy=auth_action_policy(settings, "auth_login"),
+        policy=auth_action_policy(settings, "auth_login_ip"),
+        subject=rate_limit_subject(request),
+        response=response,
+    )
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_login_email"),
         subject=rate_limit_subject(request, payload.email),
         response=response,
     )
@@ -295,7 +311,13 @@ async def request_password_reset(
 ) -> ActionMessageResponse:
     await enforce_rate_limit(
         limiter=rate_limiter,
-        policy=auth_action_policy(settings, "auth_password_reset_request"),
+        policy=auth_action_policy(settings, "auth_password_reset_request_ip"),
+        subject=rate_limit_subject(request),
+        response=response,
+    )
+    await enforce_rate_limit(
+        limiter=rate_limiter,
+        policy=auth_action_policy(settings, "auth_password_reset_request_email"),
         subject=rate_limit_subject(request, payload.email),
         response=response,
     )
@@ -330,6 +352,25 @@ async def confirm_password_reset(
             detail="Password reset token is invalid or expired",
         ) from exc
     return ActionMessageResponse(message="Password updated; existing sessions revoked")
+
+
+@router.post(
+    "/auth/cancel-deletion", response_model=ActionMessageResponse, responses=AUTH_RESPONSES
+)
+async def cancel_deletion(
+    payload: CancelDeletionRequest,
+    database: Annotated[SQLClient, Depends(get_database)],
+) -> ActionMessageResponse:
+    record = await database.consume_action_token(
+        "cancel_deletion", hash_token(payload.action_token)
+    )
+    if record is None or await database.cancel_account_deletion(record.user.id) is None:
+        raise APIError(
+            status_code=400,
+            code="invalid_action_token",
+            detail="Action token is invalid or expired",
+        )
+    return ActionMessageResponse(message="Account deletion cancelled")
 
 
 @router.get("/me", response_model=UserResponse)

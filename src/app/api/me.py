@@ -39,6 +39,7 @@ from app.schemas.me import (
     AnalyticsResponse,
     AnalyticsSummary,
     DeleteAccountRequest,
+    DeletionRequest,
     ExportResponse,
     FolderCreateRequest,
     FolderResponse,
@@ -527,9 +528,9 @@ async def export_account(
     )
 
 
-@router.delete("", response_model=ActionMessageResponse, responses=PRIVATE_RESPONSES)
-async def delete_account(
-    payload: DeleteAccountRequest,
+@router.post("/deletion/request", response_model=ActionMessageResponse, responses=PRIVATE_RESPONSES)
+async def request_deletion(
+    payload: DeletionRequest,
     request: Request,
     response: Response,
     user: Annotated[UserRecord, Depends(get_current_user)],
@@ -543,14 +544,11 @@ async def delete_account(
         subject=rate_limit_subject(request, user.id),
         response=response,
     )
-    if not verify_password(user.password_hash, payload.password):
+    if not verify_password(user.password_hash, payload.password_confirmation):
         raise APIError(
             status_code=400, code="current_password_invalid", detail="Password is invalid"
         )
-    admin_settings = await database.get_admin_settings()
-    if user.avatar_path:
-        (avatar_dir(settings) / user.avatar_path).unlink(missing_ok=True)
-    deleted = await database.delete_account(user.id, admin_settings.user_link_retention_days)
+    deleted = await database.request_account_deletion(user.id)
     assert deleted is not None
     response.delete_cookie(
         key=settings.refresh_cookie_name,
@@ -559,7 +557,43 @@ async def delete_account(
         secure=settings.refresh_cookie_secure,
         samesite=settings.refresh_cookie_samesite,
     )
-    return ActionMessageResponse(message="Account deleted")
+    token = secrets.token_urlsafe(32)
+    from app.core.security import hash_token
+    from datetime import UTC, datetime, timedelta
+
+    await database.store_action_token(
+        user.id,
+        "cancel_deletion",
+        hash_token(token),
+        (datetime.now(UTC) + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    return ActionMessageResponse(
+        message="Account deletion scheduled for 30 days",
+        action_token=token if settings.environment.lower() != "production" else None,
+    )
+
+
+@router.delete(
+    "", response_model=ActionMessageResponse, responses=PRIVATE_RESPONSES, deprecated=True
+)
+async def delete_account(
+    payload: DeleteAccountRequest,
+    request: Request,
+    response: Response,
+    user: Annotated[UserRecord, Depends(get_current_user)],
+    database: Annotated[SQLClient, Depends(get_database)],
+    rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ActionMessageResponse:
+    return await request_deletion(
+        DeletionRequest(password_confirmation=payload.password),
+        request,
+        response,
+        user,
+        database,
+        rate_limiter,
+        settings,
+    )
 
 
 @router.get("/notifications", response_model=NotificationListResponse, responses=PRIVATE_RESPONSES)

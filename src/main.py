@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,7 @@ from fastapi.routing import APIRoute
 from app.api import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import APIError
+from app.core.security import hash_token
 from app.db.redis.links import LinkCache, RedisClient
 from app.db.sql.crud import SQLClient
 from app.services.auth import AuthService
@@ -234,9 +236,20 @@ def create_app(
             database=app_database,
             settings=app_settings,
         )
+
+        async def governance_housekeeping() -> None:
+            while True:
+                await asyncio.sleep(3600)
+                await app_database.run_governance_housekeeping()
+
+        await app_database.run_governance_housekeeping()
+        housekeeping_task = asyncio.create_task(governance_housekeeping())
         try:
             yield
         finally:
+            housekeeping_task.cancel()
+            with __import__("contextlib").suppress(asyncio.CancelledError):
+                await housekeeping_task
             if owns_cache:
                 await app_cache.close()
             if owns_rate_limiter:
@@ -342,6 +355,16 @@ def create_app(
 
     @application.exception_handler(APIError)
     async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
+        if request.url.path.startswith("/api/v1/admin/") and exc.status_code in {401, 403}:
+            try:
+                await app_database.record_admin_access_attempt(
+                    actor_id=None,
+                    route=request.url.path,
+                    reason=exc.code,
+                    ip_hash=hash_token(request.client.host if request.client else "unknown"),
+                )
+            except sqlite3.Error:
+                logging.getLogger(__name__).warning("Could not record failed admin access")
         return JSONResponse(
             status_code=exc.status_code,
             content={"code": exc.code, "detail": exc.detail},
