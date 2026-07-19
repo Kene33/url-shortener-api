@@ -35,8 +35,17 @@ export type AdminUserUpdatePayload = ApiSchema["AdminUserUpdateRequest"];
 export type AdminLinkItem = ApiSchema["AdminLinkResponse"];
 export type AdminLinkListResponse = ApiSchema["AdminLinkListResponse"];
 export type AdminLinkUpdatePayload = ApiSchema["AdminLinkUpdateRequest"];
-export type AdminSettingsResponse = ApiSchema["AdminSettingsResponse"];
-export type AdminSettingsUpdatePayload = ApiSchema["AdminSettingsUpdateRequest"];
+export type DashboardResponse = ApiSchema["DashboardResponse"];
+export type ReportItem = ApiSchema["ReportResponse"];
+export type ReportListResponse = ApiSchema["ReportListResponse"];
+export type ReportResolvePayload = ApiSchema["ReportResolveRequest"];
+export type AuditEvent = ApiSchema["AuditEventResponse"];
+export type AuditLogResponse = ApiSchema["AuditLogResponse"];
+export type RetentionSettingsResponse = ApiSchema["RetentionSettingsResponse"];
+export type RetentionSettingsUpdatePayload = ApiSchema["RetentionSettingsUpdateRequest"];
+export type ModerationCategory = NonNullable<AdminLinkUpdatePayload["category"]>;
+export type ReportStatus = ReportItem["status"];
+export type StaffRole = Extract<User["role"], "support" | "moderator" | "admin">;
 export type ProfileUpdateResponse = ApiSchema["ProfileUpdateResponse"];
 
 export interface ProfileResponse {

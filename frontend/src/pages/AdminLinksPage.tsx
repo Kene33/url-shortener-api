@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { StatusMessage } from "@/components/ui/status-message";
 import { useAdminLinksQuery, useUpdateAdminLinkMutation } from "@/features/admin/api";
 import { formatDate } from "@/lib/utils";
@@ -27,10 +28,11 @@ export function AdminLinksPage() {
   const [editingLink, setEditingLink] = useState<AdminLinkItem | null>(null);
   const [toggleTarget, setToggleTarget] = useState<AdminLinkItem | null>(null);
   const [label, setLabel] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
 
   const links = useAdminLinksQuery({
     owner_id: ownerId || undefined,
-    is_active: status || undefined,
+    is_active: status === "" ? undefined : status === "true",
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
   });
@@ -41,18 +43,21 @@ export function AdminLinksPage() {
   useEffect(() => {
     if (editingLink) {
       setLabel(editingLink.label ?? "");
+      setPasswordConfirmation("");
     }
   }, [editingLink]);
 
   const saveLabel = async () => {
     if (!editingLink) return;
-    await updateLink.mutateAsync({ label: label.trim() || null });
+    await updateLink.mutateAsync({ label: label.trim() || null, password_confirmation: passwordConfirmation });
     setEditingLink(null);
   };
 
   const toggleActive = async () => {
     if (!toggleTarget) return;
-    await updateLink.mutateAsync({ is_active: !toggleTarget.is_active });
+    const password_confirmation = window.prompt(t("admin.passwordConfirmation"));
+    if (!password_confirmation) return;
+    await updateLink.mutateAsync({ is_active: !toggleTarget.is_active, password_confirmation, category: "other", comment: "Manual moderation status change" });
     setToggleTarget(null);
   };
 
@@ -143,12 +148,16 @@ export function AdminLinksPage() {
                             }}
                           />
                         </label>
+                        <label className="grid gap-1 text-sm">
+                          <span className="text-subtle">{t("admin.passwordConfirmation")}</span>
+                          <PasswordInput value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} autoComplete="current-password" />
+                        </label>
                         {updateLink.error ? <StatusMessage type="error" message={updateLink.error.message} /> : null}
                         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                           <Dialog.Close asChild>
                             <Button variant="secondary">{t("common.cancel")}</Button>
                           </Dialog.Close>
-                          <Button onClick={() => void saveLabel()} disabled={updateLink.isPending}>
+                          <Button onClick={() => void saveLabel()} disabled={updateLink.isPending || !passwordConfirmation}>
                             <Check className="h-4 w-4" />
                             {t("admin.saveLink")}
                           </Button>

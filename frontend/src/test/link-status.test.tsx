@@ -10,6 +10,7 @@ function sessionResponse() {
       user: {
         id: 1,
         email: "user@example.com",
+        role: "user",
         is_admin: false,
         is_active: true,
         email_verified: true,
@@ -33,6 +34,7 @@ function userResponse() {
     JSON.stringify({
       id: 1,
       email: "user@example.com",
+      role: "user",
       is_admin: false,
       is_active: true,
       email_verified: true,

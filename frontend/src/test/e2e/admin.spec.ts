@@ -12,6 +12,7 @@ test("authenticated admin sees admin navigation on links page", async ({ page })
         user: {
           id: 99,
           email: "admin@example.com",
+          role: "admin",
           is_admin: true,
           is_active: true,
           email_verified: true,
@@ -32,6 +33,7 @@ test("authenticated admin sees admin navigation on links page", async ({ page })
       body: JSON.stringify({
         id: 99,
         email: "admin@example.com",
+        role: "admin",
         is_admin: true,
         is_active: true,
         email_verified: true,

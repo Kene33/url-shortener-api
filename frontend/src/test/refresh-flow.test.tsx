@@ -19,6 +19,7 @@ describe("protected refresh flow", () => {
             user: {
               id: 1,
               email: "user@example.com",
+              role: "user",
               is_admin: false,
               is_active: true,
               email_verified: true,
@@ -34,6 +35,7 @@ describe("protected refresh flow", () => {
             user: {
               id: 1,
               email: "user@example.com",
+              role: "user",
               is_admin: false,
               is_active: true,
               email_verified: true,

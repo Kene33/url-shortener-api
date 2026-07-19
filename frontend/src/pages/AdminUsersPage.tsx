@@ -19,8 +19,8 @@ export function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [pendingAction, setPendingAction] = useState<{
     user: User;
-    field: "is_active" | "is_admin";
-    nextValue: boolean;
+    field: "is_active" | "role";
+    nextValue: boolean | User["role"];
   } | null>(null);
 
   const users = useAdminUsersQuery({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
@@ -29,7 +29,7 @@ export function AdminUsersPage() {
   const updateUser = useUpdateAdminUserMutation(selectedUserId);
 
   const confirmTitle =
-    pendingAction?.field === "is_admin"
+    pendingAction?.field === "role"
       ? pendingAction.nextValue
         ? t("admin.confirmGrantAdminTitle")
         : t("admin.confirmRemoveAdminTitle")
@@ -41,7 +41,7 @@ export function AdminUsersPage() {
     ? t("admin.confirmUserChangeDescription", {
         email: pendingAction.user.email,
         action:
-          pendingAction.field === "is_admin"
+          pendingAction.field === "role"
             ? pendingAction.nextValue
               ? t("admin.makeAdmin")
               : t("admin.removeAdmin")
@@ -53,7 +53,9 @@ export function AdminUsersPage() {
 
   const confirmAction = async () => {
     if (!pendingAction) return;
-    await updateUser.mutateAsync({ [pendingAction.field]: pendingAction.nextValue });
+    const password_confirmation = window.prompt(t("admin.passwordConfirmation"));
+    if (!password_confirmation) return;
+    await updateUser.mutateAsync({ [pendingAction.field]: pendingAction.nextValue, password_confirmation });
     setPendingAction(null);
   };
 
@@ -77,7 +79,7 @@ export function AdminUsersPage() {
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="m-0 truncate text-base font-semibold">{item.display_name || item.email}</p>
-                      {item.is_admin ? <span className="pill border-accent/40 bg-accent/10 text-accent">{t("common.admin")}</span> : null}
+                      {item.role !== "user" ? <span className="pill border-accent/40 bg-accent/10 text-accent">{item.role}</span> : null}
                       {!item.is_active ? <span className="pill text-danger">{t("common.disabled")}</span> : null}
                     </div>
                     <p className="m-0 truncate text-sm text-subtle">{item.email}</p>
@@ -90,17 +92,17 @@ export function AdminUsersPage() {
 
                 <div className="grid gap-3 border-t border-border pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                   <div className="grid gap-2 text-sm text-subtle sm:grid-cols-2">
-                    <span>{t("common.role")}: {item.is_admin ? t("common.admin") : t("common.user")}</span>
+                    <span>{t("common.role")}: {item.role}</span>
                     <span>{t("common.status")}: {item.is_active ? t("common.active") : t("common.disabled")}</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
-                      onClick={() => setPendingAction({ user: item, field: "is_admin", nextValue: !item.is_admin })}
+                      onClick={() => setPendingAction({ user: item, field: "role", nextValue: item.role === "admin" ? "user" : "admin" })}
                       disabled={isSelf}
                     >
                       <Shield className="h-4 w-4" />
-                      {item.is_admin ? t("admin.removeAdmin") : t("admin.makeAdmin")}
+                      {item.role === "admin" ? t("admin.removeAdmin") : t("admin.makeAdmin")}
                     </Button>
                     <Button
                       variant={item.is_active ? "danger" : "secondary"}
@@ -132,7 +134,7 @@ export function AdminUsersPage() {
         title={confirmTitle}
         description={confirmDescription}
         confirmLabel={
-          pendingAction?.field === "is_admin"
+          pendingAction?.field === "role"
             ? pendingAction.nextValue
               ? t("admin.makeAdmin")
               : t("admin.removeAdmin")

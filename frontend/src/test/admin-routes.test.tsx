@@ -25,6 +25,24 @@ type SessionState = {
 
 const mockedUseSession = vi.mocked(useSession);
 
+function buildUser(overrides: Partial<User>): User {
+  return {
+    id: 1,
+    email: "member@example.com",
+    role: "user",
+    is_admin: false,
+    is_active: true,
+    email_verified: true,
+    display_name: "Regular Member",
+    avatar_url: null,
+    pending_email: null,
+    two_factor_enabled: false,
+    created_at: "2026-07-19T00:00:00Z",
+    updated_at: "2026-07-19T00:00:00Z",
+    ...overrides,
+  };
+}
+
 function setSession(state: Partial<SessionState>) {
   mockedUseSession.mockReturnValue({
     user: null,
@@ -48,7 +66,9 @@ function ProtectedRoute() {
 
 function AdminRoute() {
   const { user } = useSession();
-  if (!user?.is_admin) return <Navigate to="/admin/access-denied" replace />;
+  if (!user || !["support", "moderator", "admin"].includes(user.role)) {
+    return <Navigate to="/admin/access-denied" replace />;
+  }
   return <Outlet />;
 }
 
@@ -92,19 +112,7 @@ describe("admin route guards", () => {
 
   it("shows access denied for authenticated non-admin users", async () => {
     setSession({
-      user: {
-        id: 7,
-        email: "member@example.com",
-        is_admin: false,
-        is_active: true,
-        email_verified: true,
-        display_name: "Regular Member",
-        avatar_url: null,
-        pending_email: null,
-        two_factor_enabled: false,
-        created_at: "2026-07-19T00:00:00Z",
-        updated_at: "2026-07-19T00:00:00Z",
-      },
+      user: buildUser({ id: 7 }),
     });
 
     renderAdminRoutes("/admin");
@@ -114,27 +122,24 @@ describe("admin route guards", () => {
     expect(screen.getByRole("button", { name: "Открыть мои ссылки" })).toBeInTheDocument();
   });
 
-  it("renders the admin dashboard for admins", async () => {
+  it.each([
+    { role: "support" as const, is_admin: false, label: "support" },
+    { role: "moderator" as const, is_admin: false, label: "moderator" },
+    { role: "admin" as const, is_admin: true, label: "admin" },
+  ])("renders the admin dashboard for $label staff", async ({ role, is_admin }) => {
     setSession({
-      user: {
+      user: buildUser({
         id: 1,
         email: "admin@example.com",
-        is_admin: true,
-        is_active: true,
-        email_verified: true,
         display_name: "Admin User",
-        avatar_url: null,
-        pending_email: null,
-        two_factor_enabled: false,
-        created_at: "2026-07-19T00:00:00Z",
-        updated_at: "2026-07-19T00:00:00Z",
-      },
+        role,
+        is_admin,
+      }),
     });
 
     renderAdminRoutes("/admin");
 
     expect(await screen.findByRole("heading", { name: "Панель админа" })).toBeInTheDocument();
     expect(screen.getByText("Следите за пользователями, ссылками и сроком хранения.")).toBeInTheDocument();
-    expect(screen.getByText("Управление")).toBeInTheDocument();
   });
 });

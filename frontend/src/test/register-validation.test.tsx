@@ -42,4 +42,17 @@ describe("registration password validation", () => {
 
     expect(await screen.findAllByText("Password must contain at least 8 characters.")).toHaveLength(2);
   });
+
+  it("shows the password confirmation mismatch message before submitting", async () => {
+    window.history.pushState({}, "", "/register");
+    mockGuestSession();
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByPlaceholderText("Пароль"), "12345678");
+    await user.type(screen.getByPlaceholderText("Повторите пароль"), "87654321");
+    await user.click(screen.getByRole("button", { name: "Создать аккаунт" }));
+
+    expect(await screen.findByText("Пароли не совпадают.")).toBeInTheDocument();
+  });
 });
