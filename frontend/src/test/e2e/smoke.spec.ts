@@ -60,6 +60,24 @@ test("guest navigation to protected pages redirects to login", async ({ page }) 
   await expect(page.getByText("Введите email и пароль.")).toBeVisible();
 });
 
+test("mobile 404 page switches between Russian and English", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/v1/auth/refresh", async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "invalid_refresh_token", detail: "No session" }),
+    });
+  });
+
+  await page.goto("/missing-shortcode");
+  await expect(page.getByRole("heading", { name: "Страница не найдена" })).toBeVisible();
+  await page.getByRole("button", { name: "Сменить язык" }).click();
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+  await page.getByRole("button", { name: "Switch language" }).click();
+  await expect(page.getByRole("heading", { name: "Страница не найдена" })).toBeVisible();
+});
+
 test("authenticated links page shows colored active and inactive status controls", async ({ page }) => {
   await page.route("**/api/v1/auth/refresh", async (route) => {
     await route.fulfill({
