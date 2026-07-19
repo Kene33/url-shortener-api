@@ -3,6 +3,11 @@
   <p><strong>FastAPI and React link shortener with guest links, account workspaces, analytics, and admin moderation.</strong></p>
   <p><strong>Сервис коротких ссылок на FastAPI и React с гостевым режимом, личным кабинетом, аналитикой и админ-модерацией.</strong></p>
   <p>
+    <a href="./README.md"><strong>English</strong></a>
+    ·
+    <a href="./README.ru.md">Русский</a>
+  </p>
+  <p>
     <a href="#quick-start">Quick start</a>
     ·
     <a href="#architecture">Architecture</a>
@@ -25,12 +30,44 @@
   </p>
 </div>
 
-LinkCutter ships two working surfaces in one repository:
+LinkCutter combines two working surfaces in one repository:
 
 - a FastAPI backend for guest short links, auth, personal workspaces, analytics, and admin actions
 - a React 19 frontend for guests and signed-in users
 
 This repository does not document a public demo. Run it locally.
+
+## Screenshots
+
+### Public and authentication
+
+| Home, light | Home, dark |
+| --- | --- |
+| ![Light home page](./docs/screenshots/home.png) | ![Dark home page](./docs/screenshots/home-dark.png) |
+
+| Login | Registration | Email verification |
+| --- | --- | --- |
+| ![Login page](./docs/screenshots/login.png) | ![Registration page](./docs/screenshots/register.png) | ![Email verification page](./docs/screenshots/verify-email.png) |
+
+| Password reset request | Password reset confirmation |
+| --- | --- |
+| ![Password reset request](./docs/screenshots/forgot-password.png) | ![Password reset confirmation](./docs/screenshots/reset-password.png) |
+
+### Account workspace
+
+| Links | Analytics | Folders |
+| --- | --- | --- |
+| ![Links page](./docs/screenshots/links.png) | ![Analytics page](./docs/screenshots/analytics.png) | ![Folders page](./docs/screenshots/folders.png) |
+
+| Notifications | Settings | Profile |
+| --- | --- | --- |
+| ![Notifications page](./docs/screenshots/notifications.png) | ![Settings page](./docs/screenshots/settings.png) | ![Profile page](./docs/screenshots/profile.png) |
+
+### Administration
+
+| Dashboard | Users | Links | Global settings |
+| --- | --- | --- | --- |
+| ![Admin dashboard](./docs/screenshots/admin.png) | ![Admin users](./docs/screenshots/admin-users.png) | ![Admin links](./docs/screenshots/admin-links.png) | ![Admin settings](./docs/screenshots/admin-settings.png) |
 
 ## Project Snapshot
 
