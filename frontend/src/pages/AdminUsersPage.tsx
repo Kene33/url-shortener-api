@@ -5,6 +5,7 @@ import type { User } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PasswordInput } from "@/components/ui/password-input";
 import { StatusMessage } from "@/components/ui/status-message";
 import { useUpdateAdminUserMutation, useAdminUsersQuery } from "@/features/admin/api";
 import { useSession } from "@/features/session/session-provider";
@@ -22,6 +23,7 @@ export function AdminUsersPage() {
     field: "is_active" | "role";
     nextValue: boolean | User["role"];
   } | null>(null);
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
 
   const users = useAdminUsersQuery({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
   const items = useMemo(() => users.data?.items ?? [], [users.data]);
@@ -30,7 +32,7 @@ export function AdminUsersPage() {
 
   const confirmTitle =
     pendingAction?.field === "role"
-      ? pendingAction.nextValue
+      ? pendingAction.nextValue === "admin"
         ? t("admin.confirmGrantAdminTitle")
         : t("admin.confirmRemoveAdminTitle")
       : pendingAction?.nextValue
@@ -42,7 +44,7 @@ export function AdminUsersPage() {
         email: pendingAction.user.email,
         action:
           pendingAction.field === "role"
-            ? pendingAction.nextValue
+            ? pendingAction.nextValue === "admin"
               ? t("admin.makeAdmin")
               : t("admin.removeAdmin")
             : pendingAction.nextValue
@@ -53,9 +55,9 @@ export function AdminUsersPage() {
 
   const confirmAction = async () => {
     if (!pendingAction) return;
-    const password_confirmation = window.prompt(t("admin.passwordConfirmation"));
-    if (!password_confirmation) return;
-    await updateUser.mutateAsync({ [pendingAction.field]: pendingAction.nextValue, password_confirmation });
+    if (!passwordConfirmation) return;
+    await updateUser.mutateAsync({ [pendingAction.field]: pendingAction.nextValue, password_confirmation: passwordConfirmation });
+    setPasswordConfirmation("");
     setPendingAction(null);
   };
 
@@ -98,7 +100,10 @@ export function AdminUsersPage() {
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
-                      onClick={() => setPendingAction({ user: item, field: "role", nextValue: item.role === "admin" ? "user" : "admin" })}
+                      onClick={() => {
+                        setPasswordConfirmation("");
+                        setPendingAction({ user: item, field: "role", nextValue: item.role === "admin" ? "user" : "admin" });
+                      }}
                       disabled={isSelf}
                     >
                       <Shield className="h-4 w-4" />
@@ -106,7 +111,10 @@ export function AdminUsersPage() {
                     </Button>
                     <Button
                       variant={item.is_active ? "danger" : "secondary"}
-                      onClick={() => setPendingAction({ user: item, field: "is_active", nextValue: !item.is_active })}
+                      onClick={() => {
+                        setPasswordConfirmation("");
+                        setPendingAction({ user: item, field: "is_active", nextValue: !item.is_active });
+                      }}
                       disabled={isSelf}
                     >
                       {item.is_active ? <UserMinus className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
@@ -135,7 +143,7 @@ export function AdminUsersPage() {
         description={confirmDescription}
         confirmLabel={
           pendingAction?.field === "role"
-            ? pendingAction.nextValue
+            ? pendingAction.nextValue === "admin"
               ? t("admin.makeAdmin")
               : t("admin.removeAdmin")
             : pendingAction?.nextValue
@@ -144,8 +152,19 @@ export function AdminUsersPage() {
         }
         confirmVariant={pendingAction?.field === "is_active" && pendingAction.nextValue === false ? "danger" : "primary"}
         pending={updateUser.isPending}
+        confirmDisabled={!passwordConfirmation}
         onConfirm={() => void confirmAction()}
-      />
+      >
+        <label className="grid gap-1 text-sm">
+          <span className="text-subtle">{t("admin.passwordConfirmation")}</span>
+          <PasswordInput
+            autoComplete="current-password"
+            value={passwordConfirmation}
+            onChange={(event) => setPasswordConfirmation(event.target.value)}
+          />
+        </label>
+        {updateUser.error ? <StatusMessage type="error" message={updateUser.error.message} /> : null}
+      </AdminConfirmDialog>
     </div>
   );
 }

@@ -123,7 +123,9 @@ export function AdminConfirmDialog({
   confirmLabel,
   confirmVariant = "primary",
   pending,
+  confirmDisabled,
   onConfirm,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -132,7 +134,9 @@ export function AdminConfirmDialog({
   confirmLabel: string;
   confirmVariant?: "primary" | "danger";
   pending?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -143,11 +147,12 @@ export function AdminConfirmDialog({
         <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,460px)] -translate-x-1/2 -translate-y-1/2 rounded-panel border border-border bg-panel p-6 outline-none">
           <AlertDialog.Title className="text-lg font-semibold">{title}</AlertDialog.Title>
           <AlertDialog.Description className="mt-2 text-sm text-subtle">{description}</AlertDialog.Description>
+          {children ? <div className="mt-4">{children}</div> : null}
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <AlertDialog.Cancel asChild>
               <Button variant="secondary">{t("common.cancel")}</Button>
             </AlertDialog.Cancel>
-            <Button variant={confirmVariant} onClick={onConfirm} disabled={pending}>
+            <Button variant={confirmVariant} onClick={onConfirm} disabled={pending || confirmDisabled}>
               {confirmLabel}
             </Button>
           </div>
