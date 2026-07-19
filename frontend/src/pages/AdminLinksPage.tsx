@@ -29,6 +29,7 @@ export function AdminLinksPage() {
   const [toggleTarget, setToggleTarget] = useState<AdminLinkItem | null>(null);
   const [label, setLabel] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [statusPasswordConfirmation, setStatusPasswordConfirmation] = useState("");
 
   const links = useAdminLinksQuery({
     owner_id: ownerId || undefined,
@@ -55,9 +56,14 @@ export function AdminLinksPage() {
 
   const toggleActive = async () => {
     if (!toggleTarget) return;
-    const password_confirmation = window.prompt(t("admin.passwordConfirmation"));
-    if (!password_confirmation) return;
-    await updateLink.mutateAsync({ is_active: !toggleTarget.is_active, password_confirmation, category: "other", comment: "Manual moderation status change" });
+    if (!statusPasswordConfirmation) return;
+    await updateLink.mutateAsync({
+      is_active: !toggleTarget.is_active,
+      password_confirmation: statusPasswordConfirmation,
+      category: "other",
+      comment: "Manual moderation status change",
+    });
+    setStatusPasswordConfirmation("");
     setToggleTarget(null);
   };
 
@@ -167,7 +173,10 @@ export function AdminLinksPage() {
                   </Dialog.Root>
                   <Button
                     variant={item.is_active ? "danger" : "secondary"}
-                    onClick={() => setToggleTarget(item)}
+                    onClick={() => {
+                      setStatusPasswordConfirmation("");
+                      setToggleTarget(item);
+                    }}
                   >
                     <Power className="h-4 w-4" />
                     {item.is_active ? t("admin.disableLink") : t("admin.enableLink")}
@@ -205,8 +214,19 @@ export function AdminLinksPage() {
         confirmLabel={toggleTarget?.is_active ? t("admin.disableLink") : t("admin.enableLink")}
         confirmVariant={toggleTarget?.is_active ? "danger" : "primary"}
         pending={updateLink.isPending}
+        confirmDisabled={!statusPasswordConfirmation}
         onConfirm={() => void toggleActive()}
-      />
+      >
+        <label className="grid gap-1 text-sm">
+          <span className="text-subtle">{t("admin.passwordConfirmation")}</span>
+          <PasswordInput
+            autoComplete="current-password"
+            value={statusPasswordConfirmation}
+            onChange={(event) => setStatusPasswordConfirmation(event.target.value)}
+          />
+        </label>
+        {updateLink.error ? <StatusMessage type="error" message={updateLink.error.message} /> : null}
+      </AdminConfirmDialog>
     </div>
   );
 }

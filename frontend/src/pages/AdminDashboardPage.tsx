@@ -4,15 +4,17 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusMessage } from "@/components/ui/status-message";
 import { useAdminDashboardQuery } from "@/features/admin/api";
+import { useSession } from "@/features/session/session-provider";
 import { formatDate } from "@/lib/utils";
 import { AdminPageHeader, AdminQuickLink, AdminStatCard } from "@/pages/admin-shared";
 
 export function AdminDashboardPage() {
   const { t } = useTranslation();
+  const { user } = useSession();
   const dashboard = useAdminDashboardQuery();
   const data = dashboard.data;
   return <div className="space-y-4">
-    <AdminPageHeader title={t("admin.dashboardTitle")} subtitle={t("admin.dashboardSubtitle")} actions={<><AdminQuickLink to="/admin/users" label={t("admin.openUsers")} /><AdminQuickLink to="/admin/links" label={t("admin.openLinks")} /><AdminQuickLink to="/admin/settings" label={t("admin.openSettings")} /></>} />
+    <AdminPageHeader title={t("admin.dashboardTitle")} subtitle={t("admin.dashboardSubtitle")} actions={<>{user?.role === "admin" ? <AdminQuickLink to="/admin/users" label={t("admin.openUsers")} /> : null}<AdminQuickLink to="/admin/links" label={t("admin.openLinks")} />{user?.role === "admin" ? <AdminQuickLink to="/admin/settings" label={t("admin.openSettings")} /> : null}</>} />
     {dashboard.isLoading ? <StatusMessage type="loading" message={t("admin.dashboardLoading")} /> : null}
     {dashboard.error ? <StatusMessage type="error" message={dashboard.error.message} /> : null}
     {data ? <>

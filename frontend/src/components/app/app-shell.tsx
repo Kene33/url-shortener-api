@@ -20,12 +20,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     { to: "/settings", label: t("nav.settings"), icon: Settings }, { to: "/profile", label: t("nav.profile"), icon: User2 },
     { to: "/notifications", label: t("nav.notifications"), icon: Bell },
   ], [t]);
-  const adminLinks = useMemo(() => [
-    { to: "/admin", label: t("nav.admin"), icon: Shield }, { to: "/admin/users", label: t("nav.adminUsers"), icon: Users },
-    { to: "/admin/links", label: t("nav.adminLinks"), icon: Link2 }, { to: "/admin/settings", label: t("nav.adminSettings"), icon: Settings },
-  ], [t]);
+  const adminLinks = useMemo(() => {
+    if (user?.role === "admin") return [
+      { to: "/admin", label: t("nav.admin"), icon: Shield }, { to: "/admin/users", label: t("nav.adminUsers"), icon: Users },
+      { to: "/admin/links", label: t("nav.adminLinks"), icon: Link2 }, { to: "/admin/settings", label: t("nav.adminSettings"), icon: Settings },
+    ];
+    if (user?.role === "moderator") return [
+      { to: "/admin", label: t("nav.admin"), icon: Shield }, { to: "/admin/links", label: t("nav.adminLinks"), icon: Link2 },
+    ];
+    if (user?.role === "support") return [{ to: "/admin/users", label: t("nav.adminUsers"), icon: Users }];
+    return [];
+  }, [t, user?.role]);
   const renderLink = (to: string, label: string, Icon: typeof Home) => <NavLink key={to} to={to} end={to === "/admin"} onClick={onNavigate} className={({ isActive }) => cn("flex items-center gap-3 rounded-panel px-3 py-2 text-sm text-subtle transition hover:bg-muted hover:text-text", isActive && "bg-accent/10 text-accent")}><Icon className="h-4 w-4" /><span>{label}</span></NavLink>;
-  const isStaff = user?.role !== "user";
+  const isStaff = adminLinks.length > 0;
   return <div className="flex h-full flex-col gap-6"><Logo /><nav className="flex flex-1 flex-col gap-5"><div className="flex flex-col gap-1">{primaryLinks.map(({ to, label, icon }) => renderLink(to, label, icon))}</div>{isStaff ? <div className="flex flex-col gap-1"><p className="px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">{t("nav.adminSection")}</p>{adminLinks.map(({ to, label, icon }) => renderLink(to, label, icon))}</div> : null}</nav><Button variant="ghost" className="justify-start" onClick={() => void logout()}>{t("shell.logout")}</Button></div>;
 }
 
