@@ -19,7 +19,7 @@ from app.api.dependencies import (
 from app.api.rate_limit import auth_action_policy, enforce_rate_limit, rate_limit_subject
 from app.core.config import Settings
 from app.core.errors import APIError
-from app.core.security import verify_password
+from app.core.security import hash_token, verify_password
 from app.db.sql.crud import FolderRecord, LinkRecord, NotificationRecord, SQLClient, UserRecord
 from app.schemas.auth import (
     ActionMessageResponse,
@@ -204,13 +204,18 @@ async def get_my_link(
 async def update_my_link(
     shortcode: str,
     payload: UpdateLinkRequest,
+    request: Request,
     user: Annotated[UserRecord, Depends(get_current_user)],
+    database: Annotated[SQLClient, Depends(get_database)],
     service: Annotated[LinkService, Depends(get_link_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LinkResponse:
     fields = payload.model_fields_set
     if not fields:
         raise APIError(status_code=400, code="invalid_update", detail="No update fields provided")
+    previous = await database.get_owned_link(shortcode, user.id)
+    if previous is None:
+        raise APIError(status_code=404, code="link_not_found", detail="Short link not found")
     try:
         link = await service.update_link_metadata(
             shortcode,
@@ -226,6 +231,25 @@ async def update_my_link(
         raise APIError(status_code=404, code="folder_not_found", detail="Folder not found") from exc
     if link is None:
         raise APIError(status_code=404, code="link_not_found", detail="Short link not found")
+    await database.add_audit_log(
+        actor_id=user.id,
+        actor_role=user.role,
+        action="link.updated",
+        object_type="link",
+        object_id=link.shortcode,
+        old_value={
+            "label": previous.label,
+            "folder_id": previous.folder_id,
+            "is_active": previous.is_active,
+        },
+        new_value={
+            "label": link.label,
+            "folder_id": link.folder_id,
+            "is_active": link.is_active,
+        },
+        route=request.url.path,
+        ip_hash=hash_token(request.client.host if request.client else "unknown"),
+    )
     return link_response(link, settings)
 
 

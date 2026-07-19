@@ -6,11 +6,18 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.api.dependencies import get_link_service, get_optional_user, get_rate_limiter, get_settings
+from app.api.dependencies import (
+    get_database,
+    get_link_service,
+    get_optional_user,
+    get_rate_limiter,
+    get_settings,
+)
 from app.api.rate_limit import enforce_rate_limit, guest_link_policy, rate_limit_subject
 from app.core.config import Settings
 from app.core.errors import APIError
-from app.db.sql.crud import UserRecord
+from app.core.security import hash_token
+from app.db.sql.crud import SQLClient, UserRecord
 from app.schemas.links import (
     CreateLinkRequest,
     CreateLinkResponse,
@@ -79,6 +86,7 @@ async def create_link(
     rate_limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
     settings: Annotated[Settings, Depends(get_settings)],
     user: Annotated[UserRecord | None, Depends(get_optional_user)],
+    database: Annotated[SQLClient, Depends(get_database)],
 ) -> CreateLinkResponse:
     if user is None and (
         payload.mode != "reuse" or payload.label is not None or payload.folder_id is not None
@@ -120,6 +128,17 @@ async def create_link(
             detail="This destination is reserved by a disabled link",
         ) from exc
     response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+    if user is not None and created:
+        await database.add_audit_log(
+            actor_id=user.id,
+            actor_role=user.role,
+            action="link.created",
+            object_type="link",
+            object_id=link.shortcode,
+            new_value={"label": link.label, "folder_id": link.folder_id},
+            route=request.url.path,
+            ip_hash=hash_token(request.client.host if request.client else "unknown"),
+        )
     return CreateLinkResponse(
         shortcode=link.shortcode,
         short_url=link_short_url(link.shortcode, settings),
