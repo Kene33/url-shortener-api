@@ -34,7 +34,7 @@ function isAllowedRole(role: string | undefined, allowed: readonly StaffRole[]) 
 }
 
 function getDefaultStaffPath(role: string | undefined) {
-  if (isAllowedRole(role, adminRouteRoles.dashboard)) return "/admin";
+  if (isAllowedRole(role, adminRouteRoles.dashboard)) return "/admin/dashboard";
   if (isAllowedRole(role, adminRouteRoles.users)) return "/admin/users";
   return "/admin/access-denied";
 }
