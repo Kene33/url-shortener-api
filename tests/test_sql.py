@@ -209,3 +209,46 @@ async def test_startup_creates_account_and_session_tables(tmp_path):
         "two_factor_challenges",
     } <= tables
     assert user_version == 5
+
+
+@pytest.mark.asyncio
+async def test_startup_adds_action_token_payload_column_to_existing_database(tmp_path):
+    database_path = tmp_path / "legacy-action-tokens.db"
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                email TEXT NOT NULL,
+                password_hash TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE action_tokens (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                purpose TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    database = SQLClient(str(database_path))
+    await database.create_database()
+
+    connection = sqlite3.connect(database_path)
+    try:
+        columns = {column[1] for column in connection.execute("PRAGMA table_info(action_tokens)")}
+    finally:
+        connection.close()
+
+    assert "payload_json" in columns

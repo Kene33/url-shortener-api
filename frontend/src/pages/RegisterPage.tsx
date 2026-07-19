@@ -6,22 +6,22 @@ import { z } from "zod";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { StatusMessage } from "@/components/ui/status-message";
 import { AuthFooter, AuthLayout } from "@/pages/shared";
 
-const schema = z
-  .object({
-    email: z.email(),
-    password: z.string().min(8),
-    confirmPassword: z.string().min(8),
-  })
-  .refine((value) => value.password === value.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords must match",
-  });
-
 export function RegisterPage() {
   const { t } = useTranslation();
+  const schema = z
+    .object({
+      email: z.email(),
+      password: z.string().min(8, t("auth.passwordTooShort")),
+      confirmPassword: z.string().min(8, t("auth.passwordTooShort")),
+    })
+    .refine((value) => value.password === value.confirmPassword, {
+      path: ["confirmPassword"],
+      message: t("auth.passwordsMustMatch"),
+    });
   const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +41,8 @@ export function RegisterPage() {
             const response = await api.register({ email, password });
             setMessage(
               response.verification_token
-                ? `Аккаунт создан. Dev token: ${response.verification_token}`
-                : "Аккаунт создан. Проверьте email для подтверждения.",
+                ? t("auth.devToken", { token: response.verification_token })
+                : t("auth.accountCreated"),
             );
           } catch (nextError) {
             setError(nextError instanceof Error ? nextError.message : "Registration failed");
@@ -50,8 +50,32 @@ export function RegisterPage() {
         })}
       >
         <Input placeholder="Email" type="email" {...form.register("email")} />
-        <Input placeholder={t("common.password")} type="password" {...form.register("password")} />
-        <Input placeholder={t("common.confirmPassword")} type="password" {...form.register("confirmPassword")} />
+        <div className="space-y-1">
+          <PasswordInput
+            placeholder={t("common.password")}
+            aria-invalid={Boolean(form.formState.errors.password)}
+            aria-describedby={form.formState.errors.password ? "register-password-error" : undefined}
+            {...form.register("password")}
+          />
+          {form.formState.errors.password ? (
+            <p id="register-password-error" role="alert" className="m-0 text-sm text-danger">
+              {form.formState.errors.password.message}
+            </p>
+          ) : null}
+        </div>
+        <div className="space-y-1">
+          <PasswordInput
+            placeholder={t("common.confirmPassword")}
+            aria-invalid={Boolean(form.formState.errors.confirmPassword)}
+            aria-describedby={form.formState.errors.confirmPassword ? "register-confirm-password-error" : undefined}
+            {...form.register("confirmPassword")}
+          />
+          {form.formState.errors.confirmPassword ? (
+            <p id="register-confirm-password-error" role="alert" className="m-0 text-sm text-danger">
+              {form.formState.errors.confirmPassword.message}
+            </p>
+          ) : null}
+        </div>
         <Button type="submit" className="w-full">
           {t("auth.registerAction")}
         </Button>

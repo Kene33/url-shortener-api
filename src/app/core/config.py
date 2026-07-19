@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = Field(default=15, ge=1, le=1440)
     refresh_token_days: int = Field(default=30, ge=1, le=365)
     email_verification_hours: int = Field(default=24, ge=1, le=168)
+    email_verification_required: bool = False
     password_reset_minutes: int = Field(default=30, ge=5, le=1440)
     avatar_dir: str = "data/avatars"
     refresh_cookie_name: str = "linkcutter_refresh"

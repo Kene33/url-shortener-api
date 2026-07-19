@@ -157,6 +157,7 @@ class SQLClient:
             await self._create_schema(db)
             await self._ensure_user_columns(db)
             await self._ensure_link_columns(db)
+            await self._ensure_action_token_columns(db)
             await db.execute("PRAGMA user_version = 5")
             await db.commit()
 
@@ -166,15 +167,16 @@ class SQLClient:
         password_hash: str,
         *,
         is_admin: bool = False,
+        email_verified: bool = False,
     ) -> UserRecord:
         async with self._connect() as db:
             cursor = await db.execute(
                 f"""
-                INSERT INTO users (email, password_hash, is_admin)
-                VALUES (?, ?, ?)
+                INSERT INTO users (email, password_hash, is_admin, email_verified)
+                VALUES (?, ?, ?, ?)
                 RETURNING {USER_COLUMNS}
                 """,
-                (email, password_hash, int(is_admin)),
+                (email, password_hash, int(is_admin), int(email_verified)),
             )
             user = self._to_user(await cursor.fetchone())
             await db.execute(
@@ -1760,6 +1762,13 @@ class SQLClient:
         for key, statement in additions.items():
             if key not in columns:
                 await db.execute(statement)
+
+    async def _ensure_action_token_columns(self, db: aiosqlite.Connection) -> None:
+        columns = await self._table_columns(db, "action_tokens")
+        if "payload_json" not in columns:
+            await db.execute(
+                "ALTER TABLE action_tokens ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}'"
+            )
 
     async def _ensure_admin_settings(self, db: aiosqlite.Connection) -> None:
         await db.execute(

@@ -12,12 +12,12 @@ async def register_verify_login(
     )
     assert registered.status_code == 201
     verification_token = registered.json()["verification_token"]
-
-    verified = await client.post(
-        "/api/v1/auth/verify-email",
-        json={"token": verification_token},
-    )
-    assert verified.status_code == 200
+    if verification_token:
+        verified = await client.post(
+            "/api/v1/auth/verify-email",
+            json={"token": verification_token},
+        )
+        assert verified.status_code == 200
 
     login = await client.post(
         "/api/v1/auth/login",
@@ -32,7 +32,7 @@ def bearer(tokens: dict) -> dict[str, str]:
 
 
 @pytest.mark.asyncio
-async def test_registration_verification_login_refresh_and_logout(app_factory):
+async def test_registration_login_refresh_and_logout_without_email_verification(app_factory):
     async with app_factory() as harness:
         registered = await harness.client.post(
             "/api/v1/auth/register",
@@ -40,13 +40,14 @@ async def test_registration_verification_login_refresh_and_logout(app_factory):
         )
         assert registered.status_code == 201
         assert registered.json()["user"]["email"] == "user@example.com"
+        assert registered.json()["verification_required"] is False
+        assert registered.json()["verification_token"] is None
 
-        unverified_login = await harness.client.post(
+        login = await harness.client.post(
             "/api/v1/auth/login",
             json={"email": "user@example.com", "password": "StrongPass123!"},
         )
-        assert unverified_login.status_code == 403
-        assert unverified_login.json()["code"] == "email_not_verified"
+        assert login.status_code == 200
 
         duplicate = await harness.client.post(
             "/api/v1/auth/register",
@@ -54,17 +55,6 @@ async def test_registration_verification_login_refresh_and_logout(app_factory):
         )
         assert duplicate.status_code == 409
 
-        verified = await harness.client.post(
-            "/api/v1/auth/verify-email",
-            json={"token": registered.json()["verification_token"]},
-        )
-        assert verified.status_code == 200
-
-        login = await harness.client.post(
-            "/api/v1/auth/login",
-            json={"email": "user@example.com", "password": "StrongPass123!"},
-        )
-        assert login.status_code == 200
         tokens = login.json()
         first_cookie = harness.client.cookies.get("linkcutter_refresh")
         assert first_cookie

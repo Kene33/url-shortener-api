@@ -121,9 +121,11 @@ async def register(
         ) from exc
     return RegisterResponse(
         user=user_response(user, settings),
-        verification_required=True,
+        verification_required=settings.email_verification_required,
         verification_token=(
-            verification_token if settings.environment.lower() != "production" else None
+            verification_token
+            if settings.email_verification_required and settings.environment.lower() != "production"
+            else None
         ),
     )
 

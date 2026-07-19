@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { StatusMessage } from "@/components/ui/status-message";
 import { useSession } from "@/features/session/session-provider";
 import { AuthFooter, AuthLayout } from "@/pages/shared";
@@ -52,7 +53,7 @@ export function LoginPage() {
           })}
         >
           <Input placeholder="Email" type="email" {...form.register("email")} />
-          <Input placeholder={t("common.password")} type="password" {...form.register("password")} />
+          <PasswordInput placeholder={t("common.password")} {...form.register("password")} />
           <Button type="submit" className="w-full">
             {t("auth.loginAction")}
           </Button>

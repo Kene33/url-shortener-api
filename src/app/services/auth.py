@@ -71,7 +71,7 @@ class AuthService:
         self.database = database
         self.settings = settings
 
-    async def register(self, email: str, password: str) -> tuple[UserRecord, str]:
+    async def register(self, email: str, password: str) -> tuple[UserRecord, str | None]:
         normalized_email = email.strip().lower()
         password_hash = await asyncio.to_thread(hash_password, password)
         try:
@@ -79,9 +79,12 @@ class AuthService:
                 normalized_email,
                 password_hash,
                 is_admin=normalized_email in self.settings.admin_emails,
+                email_verified=not self.settings.email_verification_required,
             )
         except sqlite3.IntegrityError as exc:
             raise EmailAlreadyRegisteredError(normalized_email) from exc
+        if not self.settings.email_verification_required:
+            return user, None
         token = create_opaque_token()
         await self.database.store_action_token(
             user.id,
@@ -302,9 +305,8 @@ class AuthService:
     def _generate_2fa_code() -> str:
         return f"{secrets.randbelow(1_000_000):06d}"
 
-    @staticmethod
-    def _ensure_login_allowed(user: UserRecord) -> None:
+    def _ensure_login_allowed(self, user: UserRecord) -> None:
         if not user.is_active or user.deleted_at is not None:
             raise InactiveUserError
-        if not user.email_verified:
+        if self.settings.email_verification_required and not user.email_verified:
             raise EmailNotVerifiedError
