@@ -39,19 +39,11 @@ This repository does not document a public demo. Run it locally.
 
 ## Screenshots
 
-### Public and authentication
+### Main screen
 
 | Home, light | Home, dark |
 | --- | --- |
 | ![Light home page](./docs/screenshots/home.png) | ![Dark home page](./docs/screenshots/home-dark.png) |
-
-| Login | Registration | Email verification |
-| --- | --- | --- |
-| ![Login page](./docs/screenshots/login.png) | ![Registration page](./docs/screenshots/register.png) | ![Email verification page](./docs/screenshots/verify-email.png) |
-
-| Password reset request | Password reset confirmation |
-| --- | --- |
-| ![Password reset request](./docs/screenshots/forgot-password.png) | ![Password reset confirmation](./docs/screenshots/reset-password.png) |
 
 ### Account workspace
 
@@ -62,12 +54,6 @@ This repository does not document a public demo. Run it locally.
 | Notifications | Settings | Profile |
 | --- | --- | --- |
 | ![Notifications page](./docs/screenshots/notifications.png) | ![Settings page](./docs/screenshots/settings.png) | ![Profile page](./docs/screenshots/profile.png) |
-
-### Administration
-
-| Dashboard | Users | Links | Global settings |
-| --- | --- | --- | --- |
-| ![Admin dashboard](./docs/screenshots/admin.png) | ![Admin users](./docs/screenshots/admin-users.png) | ![Admin links](./docs/screenshots/admin-links.png) | ![Admin settings](./docs/screenshots/admin-settings.png) |
 
 ## Project Snapshot
 

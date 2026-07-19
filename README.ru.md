@@ -24,21 +24,13 @@ LinkCutter состоит из FastAPI API и React-приложения. Гос
 
 ## Скриншоты
 
-### Главная и вход
+### Главная
 
 | Главная, светлая тема | Главная, тёмная тема |
 | --- | --- |
 | ![Главная страница, светлая тема](./docs/screenshots/home.png) | ![Главная страница, тёмная тема](./docs/screenshots/home-dark.png) |
 
-| Вход | Регистрация | Подтверждение email |
-| --- | --- | --- |
-| ![Страница входа](./docs/screenshots/login.png) | ![Страница регистрации](./docs/screenshots/register.png) | ![Подтверждение email](./docs/screenshots/verify-email.png) |
-
-| Запрос сброса пароля | Новый пароль |
-| --- | --- |
-| ![Запрос сброса пароля](./docs/screenshots/forgot-password.png) | ![Подтверждение нового пароля](./docs/screenshots/reset-password.png) |
-
-### Кабинет и администрирование
+### Кабинет
 
 | Мои ссылки | Аналитика | Папки |
 | --- | --- | --- |
@@ -47,10 +39,6 @@ LinkCutter состоит из FastAPI API и React-приложения. Гос
 | Уведомления | Настройки | Профиль |
 | --- | --- | --- |
 | ![Уведомления](./docs/screenshots/notifications.png) | ![Настройки](./docs/screenshots/settings.png) | ![Профиль](./docs/screenshots/profile.png) |
-
-| Админ-панель | Пользователи | Ссылки | Глобальные настройки |
-| --- | --- | --- | --- |
-| ![Админ-панель](./docs/screenshots/admin.png) | ![Пользователи](./docs/screenshots/admin-users.png) | ![Админские ссылки](./docs/screenshots/admin-links.png) | ![Настройки администратора](./docs/screenshots/admin-settings.png) |
 
 ## Возможности
 
