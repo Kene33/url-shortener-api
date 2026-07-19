@@ -17,8 +17,25 @@ export function formatDate(value?: string | null, locale = i18n.resolvedLanguage
   }).format(new Date(value));
 }
 
-export function copyToClipboard(value: string) {
-  return navigator.clipboard.writeText(value);
+export async function copyToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // Some embedded browsers deny Clipboard API access despite a user gesture.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Clipboard access is unavailable");
 }
 
 export function getInitials(value?: string | null) {

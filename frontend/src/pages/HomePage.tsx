@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChartNoAxesColumn, ShieldCheck, UserRoundPlus, Zap } from "lucide-react";
+import { Check, ChartNoAxesColumn, ShieldCheck, UserRoundPlus, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ThemeLanguageControls } from "@/components/app/theme-language-controls";
@@ -28,6 +29,19 @@ export function HomePage() {
   });
 
   const result = mutation.data?.short_url;
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = window.setTimeout(() => setCopied(false), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [copied]);
+
+  const copyResult = async () => {
+    if (!result) return;
+    await copyToClipboard(result);
+    setCopied(true);
+  };
 
   return (
     <div className={user ? "" : "page-shell"}>
@@ -75,7 +89,7 @@ export function HomePage() {
               {result ? (
                 <div className="panel-soft flex items-center justify-between gap-3 p-3" aria-live="polite">
                   <span className="min-w-0 truncate">{result}</span>
-                  <Button variant="secondary" size="sm" onClick={() => void copyToClipboard(result)} type="button">
+                  <Button variant="secondary" size="sm" onClick={() => void copyResult()} type="button">
                     {t("common.copy")}
                   </Button>
                 </div>
@@ -121,6 +135,7 @@ export function HomePage() {
           </Card>
         </div>
       </div>
+      {copied ? <div role="status" className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-panel border border-border bg-panel px-4 py-3 text-sm shadow-panel"><Check className="h-4 w-4 text-success" />{t("common.copied")}</div> : null}
     </div>
   );
 }
