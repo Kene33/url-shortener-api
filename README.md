@@ -39,12 +39,6 @@ This repository does not document a public demo. Run it locally.
 
 ## Screenshots
 
-### Main screen
-
-| Home, light | Home, dark |
-| --- | --- |
-| ![Light home page](./docs/screenshots/home.png) | ![Dark home page](./docs/screenshots/home-dark.png) |
-
 ### Account workspace
 
 | Links | Analytics | Folders |
