@@ -116,5 +116,17 @@ ree.md
 # Local project planning
 ROADMAP.local.md
 FRONTEND_ROADMAP.local.md
+
+# Keep only the public project README in the repository.
+README*
+!README.md
+readme*.md
+
+# Local Codex agents, skills, and audit artifacts
+.agents/
+.readme-roast/
+skills-lock.json
+
 uv.lock
 .vercel
+.env*
