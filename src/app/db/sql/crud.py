@@ -1002,7 +1002,7 @@ class SQLClient:
                 INSERT INTO analytics_hourly (link_id, bucket_start, count)
                 VALUES (?, ?, 1)
                 ON CONFLICT(link_id, bucket_start)
-                DO UPDATE SET count = count + 1
+                DO UPDATE SET count = analytics_hourly.count + 1
                 """,
                 (link_id, hour),
             )
@@ -1011,7 +1011,7 @@ class SQLClient:
                 INSERT INTO analytics_daily (link_id, bucket_start, count)
                 VALUES (?, ?, 1)
                 ON CONFLICT(link_id, bucket_start)
-                DO UPDATE SET count = count + 1
+                DO UPDATE SET count = analytics_daily.count + 1
                 """,
                 (link_id, day),
             )
