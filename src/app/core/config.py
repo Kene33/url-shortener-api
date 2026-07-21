@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     public_base_url: HttpUrl = HttpUrl("http://localhost:8000")
     database_path: str = "data/links.db"
+    database_url: str | None = None
     redis_url: str = "redis://localhost:6379/0"
     rate_limit_prefix: str = "ratelimit"
     guest_link_rate_limit_requests: int = Field(default=30, ge=1, le=10000)

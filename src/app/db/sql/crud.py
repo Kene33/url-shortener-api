@@ -144,11 +144,28 @@ class SQLClient:
         database_path: str = "data/links.db",
         *,
         user_link_retention_days_default: int = 365,
+        database_url: str | None = None,
     ) -> None:
         self.database_path = database_path
+        self.database_url = database_url
         self.user_link_retention_days_default = user_link_retention_days_default
 
     async def create_database(self) -> None:
+        if self.database_url:
+            from app.db.sql.postgres import table_columns
+
+            columns = await table_columns(self.database_url, "links")
+            async with self._connect() as db:
+                if columns and "normalized_url" not in columns:
+                    raise RuntimeError("Unsupported legacy PostgreSQL links schema")
+                await self._create_schema(db)
+                await self._ensure_user_columns(db)
+                await self._ensure_link_columns(db)
+                await self._ensure_action_token_columns(db)
+                await self._ensure_governance_schema(db)
+                await self._ensure_admin_settings(db)
+                await db.commit()
+            return
         path = Path(self.database_path)
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
 
@@ -195,8 +212,9 @@ class SQLClient:
             await db.execute(
                 """
                 INSERT OR IGNORE INTO preferences (user_id)
-                VALUES (last_insert_rowid())
-                """
+                VALUES (?)
+                """,
+                (user.id,),
             )
             await db.commit()
             assert user is not None
@@ -1830,6 +1848,10 @@ class SQLClient:
             await db.execute("SELECT 1")
 
     def _connect(self) -> aiosqlite.Connection:
+        if self.database_url:
+            from app.db.sql.postgres import connect
+
+            return connect(self.database_url)
         return aiosqlite.connect(self.database_path, timeout=5)
 
     def _reuse_or_connect(self, connection: aiosqlite.Connection | None):

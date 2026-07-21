@@ -202,6 +202,7 @@ def create_app(
     app_database = database or SQLClient(
         app_settings.database_path,
         user_link_retention_days_default=app_settings.user_link_retention_days_default,
+        database_url=app_settings.database_url,
     )
     app_cache = cache or RedisClient(
         app_settings.redis_url,
