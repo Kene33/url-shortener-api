@@ -55,6 +55,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
 
+  const clearSession = () => {
+    setAccessToken(null);
+    setUser(null);
+    setPreferences(null);
+  };
+
   const setSessionFromResponse = (response: SessionResponse) => {
     setAccessToken(response.access_token);
     setUser(response.user);
@@ -71,8 +77,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return response.access_token;
         } catch {
           setAccessToken(null);
-          setUser(null);
-          setPreferences(null);
           return null;
         }
       },
@@ -119,9 +123,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const logoutMutation = useMutation({
     mutationFn: api.logout,
     onSettled: () => {
-      setAccessToken(null);
-      setUser(null);
-      setPreferences(null);
+      clearSession();
       void queryClient.invalidateQueries();
     },
   });

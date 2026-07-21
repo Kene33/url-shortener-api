@@ -2,6 +2,16 @@ import { render, screen } from "@testing-library/react";
 import { App } from "@/app/App";
 
 describe("protected refresh flow", () => {
+  const user = {
+    id: 1,
+    email: "user@example.com",
+    role: "user",
+    is_admin: false,
+    is_active: true,
+    email_verified: true,
+    created_at: "2026-07-16T10:00:00Z",
+  };
+
   it("refreshes once after a 401 and retries the protected request", async () => {
     window.history.pushState({}, "", "/links");
     let refreshCalls = 0;
@@ -16,15 +26,7 @@ describe("protected refresh flow", () => {
             access_token: `token-${refreshCalls}`,
             token_type: "bearer",
             expires_in: 3600,
-            user: {
-              id: 1,
-              email: "user@example.com",
-              role: "user",
-              is_admin: false,
-              is_active: true,
-              email_verified: true,
-              created_at: "2026-07-16T10:00:00Z",
-            },
+            user,
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -33,13 +35,7 @@ describe("protected refresh flow", () => {
         return new Response(
           JSON.stringify({
             user: {
-              id: 1,
-              email: "user@example.com",
-              role: "user",
-              is_admin: false,
-              is_active: true,
-              email_verified: true,
-              created_at: "2026-07-16T10:00:00Z",
+              ...user,
             },
             preferences: {
               theme: "dark",
@@ -96,5 +92,68 @@ describe("protected refresh flow", () => {
     expect(await screen.findByText("Campaign")).toBeInTheDocument();
     expect(refreshCalls).toBe(2);
     expect(linksCalls).toBe(2);
+  });
+
+  it("keeps the current screen when a background refresh fails", async () => {
+    window.history.pushState({}, "", "/links");
+    let refreshCalls = 0;
+
+    global.fetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/auth/refresh")) {
+        refreshCalls += 1;
+        if (refreshCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              access_token: "token-1",
+              token_type: "bearer",
+              expires_in: 3600,
+              user,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify({ code: "invalid_refresh_token", detail: "No session" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.endsWith("/api/v1/me")) {
+        return new Response(JSON.stringify(user), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.endsWith("/api/v1/me/preferences")) {
+        return new Response(
+          JSON.stringify({
+            theme: "dark",
+            language: "ru",
+            email_notifications: true,
+            system_notifications: true,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/api/v1/me/links?")) {
+        return new Response(JSON.stringify({ code: "invalid_access_token", detail: "expired" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.endsWith("/api/v1/me/folders")) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    }) as typeof fetch;
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Мои ссылки" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Войти" })).not.toBeInTheDocument();
+    expect(refreshCalls).toBe(2);
   });
 });
