@@ -2390,10 +2390,12 @@ class SQLClient:
                     now.strftime("%Y-%m-%d %H:%M:%S"),
                 ],
             )
-            raw_series = [
-                (datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC), row[1])
-                for row in await cursor.fetchall()
-            ]
+            raw_series = []
+            for row in await cursor.fetchall():
+                point_time = datetime.fromisoformat(row[0])
+                if point_time.tzinfo is None:
+                    point_time = point_time.replace(tzinfo=UTC)
+                raw_series.append((point_time, row[1]))
             cursor = await db.execute(
                 f"""
                 SELECT {LINK_COLUMNS}
