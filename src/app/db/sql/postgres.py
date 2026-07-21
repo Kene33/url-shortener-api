@@ -26,6 +26,10 @@ _PRAGMA_COLUMNS = re.compile(r"^\s*PRAGMA\s+table_info\(([^)]+)\)\s*$", re.IGNOR
 _RETENTION_DATE = re.compile(
     r"(\w+)\s*<\s*datetime\('now',\s*%s\)", re.IGNORECASE
 )
+_TEXT_TIMESTAMP_COMPARISON = re.compile(
+    r"\b(expires_at|deletion_scheduled_for)\s*(<=|>=|<|>)\s*CURRENT_TIMESTAMP\b",
+    re.IGNORECASE,
+)
 
 
 def _translate_sql(sql: str) -> str:
@@ -39,6 +43,7 @@ def _translate_sql(sql: str) -> str:
     sql = _IGNORE_INSERT.sub("INSERT INTO", sql)
     sql = _PLACEHOLDER.sub("%s", sql)
     sql = _RETENTION_DATE.sub(r"\1 < (CURRENT_TIMESTAMP + (%s || ' days')::interval)", sql)
+    sql = _TEXT_TIMESTAMP_COMPARISON.sub(r"\1::timestamp \2 CURRENT_TIMESTAMP", sql)
     if ignore_insert and "ON CONFLICT" not in sql.upper():
         if " RETURNING " in sql.upper():
             sql = re.sub(
