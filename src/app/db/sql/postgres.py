@@ -27,7 +27,7 @@ _RETENTION_DATE = re.compile(
     r"(\w+)\s*<\s*datetime\('now',\s*%s\)", re.IGNORECASE
 )
 _TEXT_TIMESTAMP_COMPARISON = re.compile(
-    r"\b(expires_at|deletion_scheduled_for)\s*(<=|>=|<|>)\s*CURRENT_TIMESTAMP\b",
+    r"\b(expires_at|deletion_scheduled_for|created_at)\s*(<=|>=|<|>)\s*CURRENT_TIMESTAMP\b",
     re.IGNORECASE,
 )
 
