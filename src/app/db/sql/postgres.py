@@ -30,6 +30,10 @@ _TEXT_TIMESTAMP_COMPARISON = re.compile(
     r"\b(expires_at|deletion_scheduled_for|created_at)\s*(<=|>=|<|>)\s*CURRENT_TIMESTAMP\b",
     re.IGNORECASE,
 )
+_TEXT_TIMESTAMP_COALESCE = re.compile(
+    r"\bCOALESCE\((revoked_at|read_at|deleted_at),\s*CURRENT_TIMESTAMP\)",
+    re.IGNORECASE,
+)
 
 
 def _translate_sql(sql: str) -> str:
@@ -46,6 +50,7 @@ def _translate_sql(sql: str) -> str:
         r"\1::timestamp < (CURRENT_TIMESTAMP + %s::interval)", sql
     )
     sql = _TEXT_TIMESTAMP_COMPARISON.sub(r"\1::timestamp \2 CURRENT_TIMESTAMP", sql)
+    sql = _TEXT_TIMESTAMP_COALESCE.sub(r"COALESCE(\1, CURRENT_TIMESTAMP::text)", sql)
     if ignore_insert and "ON CONFLICT" not in sql.upper():
         if " RETURNING " in sql.upper():
             sql = re.sub(
