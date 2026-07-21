@@ -160,6 +160,7 @@ readme*.md
 .agents/
 .readme-roast/
 skills-lock.json
+graphify-out/
 
 # Local deployment state
 .vercel/
