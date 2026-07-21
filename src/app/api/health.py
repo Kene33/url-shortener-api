@@ -3,7 +3,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, Response, status
 from redis.exceptions import RedisError
 
-from app.api.dependencies import get_cache, get_database
+from app.api.dependencies import get_cache, get_database, require_admin
 from app.db.redis.links import LinkCache
 from app.db.sql.crud import SQLClient
 from app.schemas.links import LivenessResponse, ReadinessResponse
@@ -37,6 +37,12 @@ async def liveness() -> LivenessResponse:
     response_description="SQLite доступна; Redis может быть доступен или degraded",
     operation_id="health_readiness",
     responses={
+        401: {
+            "description": "Admin authentication is required",
+        },
+        403: {
+            "description": "Administrator privileges are required",
+        },
         503: {
             "model": ReadinessResponse,
             "description": "Required SQLite storage is unavailable",
@@ -47,6 +53,7 @@ async def readiness(
     response: Response,
     database: SQLClient = Depends(get_database),
     cache: LinkCache = Depends(get_cache),
+    _admin=Depends(require_admin),
 ) -> ReadinessResponse:
     try:
         await database.ping()

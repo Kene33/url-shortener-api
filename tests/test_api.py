@@ -5,7 +5,29 @@ import sqlite3
 import pytest
 from pydantic import ValidationError
 
+from app.api.dependencies import require_admin
 from app.core.config import Settings
+
+
+async def admin_headers(client) -> dict[str, str]:
+    registered = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "admin@example.com", "password": "StrongPass123!"},
+    )
+    assert registered.status_code == 201
+    token = registered.json()["verification_token"]
+    if token:
+        verified = await client.post(
+            "/api/v1/auth/verify-email",
+            json={"token": token},
+        )
+        assert verified.status_code == 200
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@example.com", "password": "StrongPass123!"},
+    )
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
 def assert_validation_error(response) -> None:
@@ -245,13 +267,14 @@ async def test_redis_outage_uses_sqlite_and_reports_degraded_health(
     unavailable_cache,
 ):
     async with app_factory(cache=unavailable_cache) as harness:
+        headers = await admin_headers(harness.client)
         created = await harness.client.post(
             "/api/v1/links",
             json={"url": "https://example.com/fallback"},
         )
         shortcode = created.json()["shortcode"]
         resolved = await harness.client.get(f"/{shortcode}")
-        health = await harness.client.get("/health/ready")
+        health = await harness.client.get("/health/ready", headers=headers)
 
     assert created.status_code == 201
     assert resolved.status_code == 307
@@ -268,10 +291,14 @@ async def test_redis_outage_uses_sqlite_and_reports_degraded_health(
 async def test_health_endpoints_report_live_and_ready(app_factory):
     async with app_factory() as harness:
         live = await harness.client.get("/health/live")
-        ready = await harness.client.get("/health/ready")
+        public_ready = await harness.client.get("/health/ready")
+        ready = await harness.client.get(
+            "/health/ready", headers=await admin_headers(harness.client)
+        )
 
     assert live.status_code == 200
     assert live.json()["status"] == "ok"
+    assert public_ready.status_code == 401
     assert ready.status_code == 200
     assert ready.json() == {"status": "ok", "database": "up", "cache": "up"}
 
@@ -283,8 +310,12 @@ async def test_readiness_returns_503_when_sqlite_is_unavailable(app_factory):
             raise sqlite3.OperationalError("database unavailable")
 
     async with app_factory() as harness:
+        headers = await admin_headers(harness.client)
         harness.app.state.database = UnavailableDatabase()
-        response = await harness.client.get("/health/ready")
+        harness.app.dependency_overrides[require_admin] = lambda: None
+        response = await harness.client.get(
+            "/health/ready", headers=headers
+        )
 
     assert response.status_code == 503
     assert response.json() == {
@@ -302,7 +333,7 @@ async def test_openapi_declares_all_create_link_outcomes(app_factory):
     responses = specification["paths"]["/api/v1/links"]["post"]["responses"]
     assert {"200", "201", "401", "409", "422", "503"} <= set(responses)
     ready_responses = specification["paths"]["/health/ready"]["get"]["responses"]
-    assert {"200", "503"} <= set(ready_responses)
+    assert {"200", "401", "403", "503"} <= set(ready_responses)
     redirect_responses = specification["paths"]["/{shortcode}"]["get"]["responses"]
     assert {"307", "404", "410", "422", "503"} <= set(redirect_responses)
     assert {

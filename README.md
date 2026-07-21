@@ -53,7 +53,6 @@ Try the [live demo](https://url-shortener-wheat-three.vercel.app) or open the [S
 ## Live Demo
 
 - Frontend: [url-shortener-wheat-three.vercel.app](https://url-shortener-wheat-three.vercel.app)
-- Backend health: [health/ready](https://url-shortener-api-three.vercel.app/health/ready)
 - Swagger UI: [url-shortener-api-three.vercel.app/docs](https://url-shortener-api-three.vercel.app/docs)
 
 ## Screenshots
@@ -190,7 +189,7 @@ Use `demo-admin@example.com` or `demo-user@example.com` with the password you su
 | Profile and account | `/api/v1/me/profile`, `/api/v1/me/avatar`, `/api/v1/me/preferences`, `/api/v1/me/export`, `/api/v1/me/deletion/request` | Profile edits, optional email verification and email 2FA, JSON export, 30-day deletion cancellation window |
 | Notifications | `/api/v1/me/notifications*` | List, mark one read, mark all read |
 | Admin | `/api/v1/admin/dashboard`, `/api/v1/admin/users*`, `/api/v1/admin/links*`, `/api/v1/admin/reports*`, `/api/v1/admin/audit-log`, `/api/v1/admin/settings/retention` | RBAC, moderation, reports, audit trail, and retention settings |
-| Health | `/health/live`, `/health/ready` | Process status, database check, Redis status |
+| Health | `/health/live`, `/health/ready` | Public process liveness; admin-only database and Redis readiness |
 
 Backend rules worth knowing:
 
