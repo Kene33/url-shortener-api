@@ -1,0 +1,12 @@
+uv.lock
+pyproject.toml
+.venv
+.pytest_cache
+.ruff_cache
+.readme-roast
+README-AUDIT-REPORT.md
+README-IMPROVEMENT-PLAN.md
+frontend/node_modules
+frontend/dist
+frontend/.vercel
+data
