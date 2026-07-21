@@ -22,15 +22,23 @@ Thumbs.db
 # Logs
 *.log
 logs/
+*.pid
+*.seed
 
 # Test & coverage
 .coverage
+*.coverage
 htmlcov/
 .tox/
 .pytest_cache/
+.nox/
+.mypy_cache/
+.pytype/
+.ruff_cache/
 nosetests.xml
 coverage.xml
 *.cover
+coverage-reports/
 *.egg-info/
 dist/
 build/
@@ -47,6 +55,15 @@ migrations/
 # Node.js (if used)
 node_modules/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.npm-cache/
+.vite/
+*.tsbuildinfo
+playwright-report/
+test-results/
 
 # Misc
 *.bak
@@ -108,8 +125,25 @@ app.tar.gz
 prometheus/
 grafana/
 
-ree.md
 *.db
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+
+# Local runtime data and generated uploads
+data/
+!data/.gitkeep
+uploads/
+avatars/
+
+# Local secrets and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.secret
+
 # Local Codex configuration
 .codex/
 
@@ -127,6 +161,8 @@ readme*.md
 .readme-roast/
 skills-lock.json
 
+# Local deployment state
+.vercel/
+
 uv.lock
-.vercel
 .env*
