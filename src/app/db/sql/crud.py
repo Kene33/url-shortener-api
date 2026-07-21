@@ -1245,6 +1245,57 @@ class SQLClient:
             await db.commit()
             return user
 
+    async def update_avatar(
+        self,
+        user_id: int,
+        *,
+        avatar_path: str,
+        avatar_content_type: str,
+        avatar_data: bytes,
+    ) -> UserRecord | None:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                f"""
+                UPDATE users
+                SET avatar_path = ?, avatar_content_type = ?, avatar_data = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                RETURNING {USER_COLUMNS}
+                """,
+                (avatar_path, avatar_content_type, avatar_data, user_id),
+            )
+            user = self._to_user(await cursor.fetchone())
+            await db.commit()
+            return user
+
+    async def clear_avatar(self, user_id: int) -> UserRecord | None:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                f"""
+                UPDATE users
+                SET avatar_path = NULL, avatar_content_type = NULL, avatar_data = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                RETURNING {USER_COLUMNS}
+                """,
+                (user_id,),
+            )
+            user = self._to_user(await cursor.fetchone())
+            await db.commit()
+            return user
+
+    async def get_avatar(self, avatar_path: str) -> tuple[bytes, str] | None:
+        async with self._connect() as db:
+            cursor = await db.execute(
+                "SELECT avatar_data, avatar_content_type FROM users "
+                "WHERE avatar_path = ? AND avatar_data IS NOT NULL LIMIT 1",
+                (avatar_path,),
+            )
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            return bytes(row[0]), row[1]
+
     async def apply_pending_email(self, user_id: int) -> UserRecord | None:
         async with self._connect() as db:
             cursor = await db.execute(
@@ -1932,6 +1983,8 @@ class SQLClient:
                 email_verified INTEGER NOT NULL DEFAULT 0 CHECK (email_verified IN (0, 1)),
                 display_name TEXT,
                 avatar_path TEXT,
+                avatar_content_type TEXT,
+                avatar_data BYTEA,
                 pending_email TEXT UNIQUE COLLATE NOCASE,
                 deleted_at TEXT,
                 links_expire_at TEXT,
@@ -2108,6 +2161,8 @@ class SQLClient:
             "email_verified": "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
             "display_name": "ALTER TABLE users ADD COLUMN display_name TEXT",
             "avatar_path": "ALTER TABLE users ADD COLUMN avatar_path TEXT",
+            "avatar_content_type": "ALTER TABLE users ADD COLUMN avatar_content_type TEXT",
+            "avatar_data": "ALTER TABLE users ADD COLUMN avatar_data BYTEA",
             "pending_email": "ALTER TABLE users ADD COLUMN pending_email TEXT",
             "deleted_at": "ALTER TABLE users ADD COLUMN deleted_at TEXT",
             "links_expire_at": "ALTER TABLE users ADD COLUMN links_expire_at TEXT",

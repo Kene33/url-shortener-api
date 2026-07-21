@@ -5,7 +5,6 @@ from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
 
 from app.api.auth import user_response
 from app.api.dependencies import (
@@ -433,12 +432,17 @@ async def upload_avatar(
     if extension is None:
         raise APIError(status_code=400, code="invalid_update", detail="Unsupported avatar format")
     filename = f"{secrets.token_hex(16)}.{extension}"
-    path = avatar_dir(settings) / filename
-    path.write_bytes(content)
-    if user.avatar_path:
-        old_path = avatar_dir(settings) / user.avatar_path
-        old_path.unlink(missing_ok=True)
-    updated = await database.update_profile(user.id, avatar_path=filename, set_avatar_path=True)
+    content_type = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "webp": "image/webp",
+    }[extension]
+    updated = await database.update_avatar(
+        user.id,
+        avatar_path=filename,
+        avatar_content_type=content_type,
+        avatar_data=content,
+    )
     assert updated is not None
     return user_response(updated, settings)
 
@@ -449,19 +453,23 @@ async def delete_avatar(
     database: Annotated[SQLClient, Depends(get_database)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> UserResponse:
-    if user.avatar_path:
-        (avatar_dir(settings) / user.avatar_path).unlink(missing_ok=True)
-    updated = await database.update_profile(user.id, avatar_path=None, set_avatar_path=True)
+    updated = await database.clear_avatar(user.id)
     assert updated is not None
     return user_response(updated, settings)
 
 
 @router.get("/avatar/{filename}")
 async def read_avatar(
-    filename: str, settings: Annotated[Settings, Depends(get_settings)]
-) -> FileResponse:
+    filename: str,
+    database: Annotated[SQLClient, Depends(get_database)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
     if "/" in filename or "\\" in filename or filename.startswith("."):
         raise APIError(status_code=404, code="link_not_found", detail="Avatar not found")
+    stored = await database.get_avatar(filename)
+    if stored is not None:
+        content, media_type = stored
+        return Response(content=content, media_type=media_type)
     path = avatar_dir(settings) / filename
     if not path.is_file():
         raise APIError(status_code=404, code="link_not_found", detail="Avatar not found")
@@ -471,7 +479,7 @@ async def read_avatar(
         ".jpeg": "image/jpeg",
         ".webp": "image/webp",
     }.get(path.suffix.lower(), "application/octet-stream")
-    return FileResponse(path, media_type=media_type)
+    return Response(content=path.read_bytes(), media_type=media_type)
 
 
 @router.get("/preferences", response_model=PreferencesResponse, responses=PRIVATE_RESPONSES)
