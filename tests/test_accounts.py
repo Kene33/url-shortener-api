@@ -1,5 +1,7 @@
 import pytest
 
+from app.core.config import Settings
+
 
 async def register_verify_login(
     client,
@@ -110,6 +112,29 @@ async def test_password_reset_changes_password_and_revokes_sessions(app_factory)
         )
         assert new_login.status_code == 200
         assert new_login.json()["access_token"] != tokens["access_token"]
+
+
+@pytest.mark.asyncio
+async def test_development_does_not_return_action_tokens(app_factory):
+    settings = Settings(
+        environment="development",
+        public_base_url="https://sho.rt",
+        redis_url="redis://unused.invalid:6379/0",
+        cors_origins=[],
+        auth_secret_key="test-secret-key-with-at-least-24-characters",
+    )
+    async with app_factory(settings=settings) as harness:
+        registered = await harness.client.post(
+            "/api/v1/auth/register",
+            json={"email": "no-debug@example.com", "password": "StrongPass123!"},
+        )
+        assert registered.status_code == 201
+        reset = await harness.client.post(
+            "/api/v1/auth/password-reset/request",
+            json={"email": "no-debug@example.com"},
+        )
+        assert reset.status_code == 200
+        assert reset.json()["action_token"] is None
 
 
 @pytest.mark.asyncio

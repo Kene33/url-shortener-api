@@ -134,7 +134,7 @@ async def register(
         verification_required=settings.email_verification_required,
         verification_token=(
             verification_token
-            if settings.email_verification_required and settings.environment.lower() != "production"
+            if settings.email_verification_required and settings.debug_tokens_enabled
             else None
         ),
     )
@@ -221,7 +221,7 @@ async def login(
         return LoginChallengeResponse(
             login_token=exc.login_token,
             expires_in=exc.expires_in,
-            debug_code=exc.debug_code,
+            debug_code=exc.debug_code if settings.debug_tokens_enabled else None,
         )
     _set_refresh_cookie(response, tokens.refresh_token, settings)
     return token_response(tokens, settings)
@@ -324,7 +324,7 @@ async def request_password_reset(
     token = await service.request_password_reset(str(payload.email))
     return ActionMessageResponse(
         message="If the account exists, password reset instructions were created",
-        action_token=token if settings.environment.lower() != "production" else None,
+        action_token=token if settings.debug_tokens_enabled else None,
     )
 
 

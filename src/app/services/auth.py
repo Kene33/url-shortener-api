@@ -116,7 +116,7 @@ class AuthService:
             raise TwoFactorRequiredError(
                 login_token=login_token,
                 debug_code=(
-                    debug_code if self.settings.environment.lower() != "production" else None
+                    debug_code if self.settings.debug_tokens_enabled else None
                 ),
                 expires_in=self.settings.email_2fa_code_minutes * 60,
             )

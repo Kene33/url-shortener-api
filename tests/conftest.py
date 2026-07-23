@@ -77,6 +77,7 @@ def app_factory(
         )
         app_cache = cache if cache is not None else MemoryCache()
         app_settings = settings or Settings(
+            environment="test",
             public_base_url="https://sho.rt",
             database_path=app_database.database_path,
             redis_url="redis://unused.invalid:6379/0",

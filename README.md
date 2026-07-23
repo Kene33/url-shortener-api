@@ -40,7 +40,7 @@ LinkCutter combines two working surfaces in one repository:
 - a FastAPI backend for guest short links, auth, personal workspaces, analytics, and admin actions
 - a React 19 frontend for guests and signed-in users
 
-Try the [live demo](https://url-shortener-wheat-three.vercel.app) or open the [Swagger UI](https://url-shortener-api-three.vercel.app/docs). The hosted frontend uses the deployed FastAPI backend, Neon PostgreSQL, and Upstash Redis.
+Try the [live demo](https://url-shortener-kene33s-projects.vercel.app) or open the [Swagger UI](https://url-shortener-kene33s-projects.vercel.app/docs). The hosted frontend uses the deployed FastAPI backend, Supabase PostgreSQL, and Upstash Redis.
 
 ## Why LinkCutter
 
@@ -77,7 +77,7 @@ Try the [live demo](https://url-shortener-wheat-three.vercel.app) or open the [S
 | --- | --- | --- |
 | Backend | FastAPI, Pydantic v2, Uvicorn | Guest and account link creation, redirects, auth, admin API |
 | Frontend | React 19, TypeScript, Vite, Tailwind | Guest creation, links, folders, analytics, notifications, profile, settings |
-| Storage | SQLite locally, Neon PostgreSQL in production | Users, links, sessions, notifications, analytics, and avatar data |
+| Storage | SQLite locally, Supabase PostgreSQL in production | Users, links, sessions, notifications, analytics, and avatar data |
 | Cache | Redis 7 locally, Upstash Redis in production | Redirect cache and distributed rate limits |
 | Auth | Argon2, JWT access tokens, rotating refresh cookies | Register, verify email, login, logout, password reset, email 2FA |
 | QA | Ruff, pytest, Vitest, Playwright, GitHub Actions | Backend lint and tests, frontend lint, unit and browser checks |
@@ -153,7 +153,7 @@ If you want the first registered user to become an admin, set `ADMIN_EMAILS` in 
 flowchart LR
     Browser["Browser"] --> Frontend["React 19 frontend"]
     Frontend -->|REST + cookies| API["FastAPI API"]
-    API --> SQL["SQLite locally\nNeon PostgreSQL in production"]
+    API --> SQL["SQLite locally\nSupabase PostgreSQL in production"]
     API --> Cache["Redis locally\nUpstash in production"]
     API --> Files["Avatar data in database"]
     API --> Redirect["307 redirect responses"]
@@ -163,7 +163,7 @@ flowchart LR
 
 Key behavior:
 
-- SQLite stays the local source of truth. `DATABASE_URL` switches production to Neon PostgreSQL.
+- SQLite stays the local source of truth. `DATABASE_URL` switches production to Supabase PostgreSQL.
 - Redis caches shortcodes and provides rate limits. The hosted deployment uses Upstash Redis.
 - FastAPI issues JWT access tokens and rotating refresh cookies.
 - The frontend uses relative API paths. Vite proxies them in local development and Nginx proxies them in Compose.
@@ -239,7 +239,7 @@ cd frontend && npm run test:e2e
 | Account workspace and analytics | Deployed |
 | Admin moderation API | Deployed |
 | Frontend hosting | Vercel |
-| Production database | Vercel Marketplace Neon PostgreSQL |
+| Production database | Supabase PostgreSQL |
 | Production cache and rate limits | Vercel Marketplace Upstash Redis |
 | Email provider | Optional; not required by default |
 | Database migrations | Schema bootstrap exists; Alembic remains future work |

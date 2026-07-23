@@ -50,12 +50,25 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def validate_production_auth_secret(self) -> "Settings":
-        if (
-            self.environment.lower() == "production"
-            and self.auth_secret_key == "development-only-change-me"
-        ):
-            raise ValueError("AUTH_SECRET_KEY must be changed in production")
+    def validate_runtime_security(self) -> "Settings":
+        environment = self.environment.lower()
+        if environment == "production":
+            if self.auth_secret_key == "development-only-change-me":
+                raise ValueError("AUTH_SECRET_KEY must be changed in production")
+            if not self.database_url:
+                raise ValueError("DATABASE_URL is required in production")
+            if not self.redis_url or self.redis_url.startswith(("redis://localhost", "redis://redis:")):
+                raise ValueError("REDIS_URL must point to a shared Redis service in production")
+            if self.refresh_cookie_secure is not True:
+                raise ValueError("REFRESH_COOKIE_SECURE must be true in production")
+            if str(self.public_base_url).lower().startswith("http://"):
+                raise ValueError("PUBLIC_BASE_URL must use HTTPS in production")
+            if any(not origin.lower().startswith("https://") for origin in self.cors_origins):
+                raise ValueError("CORS_ORIGINS must contain only HTTPS origins in production")
+            if "*" in self.cors_origins:
+                raise ValueError("CORS_ORIGINS must not contain a wildcard in production")
+            if self.rate_limit_fail_closed_in_production is not True:
+                raise ValueError("Rate limiting must fail closed in production")
         refresh_cookie_samesite = self.refresh_cookie_samesite.lower()
         if refresh_cookie_samesite not in {"lax", "strict", "none"}:
             raise ValueError("REFRESH_COOKIE_SAMESITE must be lax, strict or none")
@@ -66,6 +79,11 @@ class Settings(BaseSettings):
         self.refresh_cookie_samesite = refresh_cookie_samesite
         self.admin_emails = [email.strip().lower() for email in self.admin_emails]
         return self
+
+    @property
+    def debug_tokens_enabled(self) -> bool:
+        """Enable fixtures' token shortcuts only in an explicitly isolated test app."""
+        return self.environment.lower() == "test"
 
 
 @lru_cache

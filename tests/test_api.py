@@ -400,3 +400,27 @@ def test_settings_reject_invalid_public_base_url():
 def test_settings_require_custom_auth_secret_in_production():
     with pytest.raises(ValidationError):
         Settings(environment="production")
+
+
+def test_production_settings_require_external_storage_and_https():
+    with pytest.raises(ValidationError, match="DATABASE_URL"):
+        Settings(
+            environment="production",
+            auth_secret_key="production-secret-key-with-at-least-24-chars",
+            public_base_url="https://sho.rt",
+            refresh_cookie_secure=True,
+            cors_origins=[],
+        )
+
+
+def test_production_settings_accept_external_storage():
+    settings = Settings(
+        environment="production",
+        auth_secret_key="production-secret-key-with-at-least-24-chars",
+        public_base_url="https://sho.rt",
+        database_url="postgresql://user:password@example.com:5432/app",
+        redis_url="rediss://default:password@example.com:6379",
+        refresh_cookie_secure=True,
+        cors_origins=[],
+    )
+    assert settings.debug_tokens_enabled is False

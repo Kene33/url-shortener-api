@@ -410,7 +410,7 @@ async def update_profile(
                 status_code=409, code="email_already_in_use", detail="Email is already in use"
             ) from exc
         updated = await database.get_user_by_id(user.id) or updated
-        if settings.environment.lower() != "production":
+        if settings.debug_tokens_enabled:
             return ProfileUpdateResponse(
                 **user_response(updated, settings).model_dump(),
                 verification_token=token,
@@ -601,7 +601,7 @@ async def request_deletion(
     )
     return ActionMessageResponse(
         message="Account deletion scheduled for 30 days",
-        action_token=token if settings.environment.lower() != "production" else None,
+        action_token=token if settings.debug_tokens_enabled else None,
     )
 
 
@@ -703,7 +703,7 @@ async def request_enable_email_2fa(
         ) from exc
     return ActionMessageResponse(
         message="Verification code generated",
-        debug_code=code if settings.environment.lower() != "production" else None,
+        debug_code=code if settings.debug_tokens_enabled else None,
     )
 
 

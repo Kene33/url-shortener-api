@@ -1,7 +1,7 @@
 """Small async PostgreSQL adapter for the existing SQL client.
 
 The application keeps SQLite for local development and tests, while production
-uses Neon through DATABASE_URL. This adapter intentionally mirrors the tiny
+uses managed PostgreSQL through DATABASE_URL. This adapter intentionally mirrors the tiny
 aiosqlite surface used by SQLClient so the domain queries stay shared.
 """
 

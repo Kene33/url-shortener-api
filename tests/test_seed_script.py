@@ -8,7 +8,8 @@ async def test_demo_seed_requires_password(tmp_path):
     settings = Settings(
         public_base_url="https://sho.rt",
         database_path=str(tmp_path / "demo.db"),
-        redis_url="redis://unused.invalid:6379/0",
+        database_url="postgresql://user:password@example.com:5432/app",
+        redis_url="rediss://default:password@example.com:6379",
         cors_origins=[],
         auth_secret_key="test-secret-key-with-at-least-24-characters",
     )
@@ -24,7 +25,8 @@ async def test_demo_seed_refuses_production(tmp_path):
         environment="production",
         public_base_url="https://sho.rt",
         database_path=str(tmp_path / "demo.db"),
-        redis_url="redis://unused.invalid:6379/0",
+        database_url="postgresql://user:password@example.com:5432/app",
+        redis_url="rediss://default:password@example.com:6379",
         cors_origins=[],
         auth_secret_key="production-secret-key-with-at-least-24-chars",
         demo_seed_password="DemoPass123!",
